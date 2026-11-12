@@ -11,6 +11,12 @@ export const arExtra = {
   'onboarding.age.under18': 'أقل من 18 — تبقى الأهداف الشخصية للطاقة معطّلة.',
   'intro.mute': 'كتم صوت البداية',
   'intro.unmute': 'تشغيل صوت البداية',
+  'theme.toDark': 'التبديل إلى المظهر الداكن',
+  'theme.toLight': 'التبديل إلى المظهر الفاتح',
+  'onboarding.point.foods': 'أطعمة مصرية ويومية جاهزة',
+  'onboarding.point.lang': 'دعم كامل للعربية والإنجليزية',
+  'onboarding.point.offline': 'يعمل دون إنترنت ودون حساب',
+  'onboarding.dayStart.short': 'يبدأ يومي الساعة',
 } as const
 
 export type ArExtraKey = keyof typeof arExtra

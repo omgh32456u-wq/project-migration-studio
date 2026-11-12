@@ -5,12 +5,11 @@ import { cn } from '@/lib/utils'
 export interface WheelItem {
   value: number
   label: string
-  tone?: string
+  /** minor: ages 15–17 (amber). threshold: age 18 (adult, marked differently from minors). */
+  tone?: 'minor' | 'threshold'
 }
 
 const ITEM_H = 40
-const VIEWPORT_H = 160
-const EDGE_H = VIEWPORT_H / 2 - ITEM_H / 2
 
 /**
  * Draggable vertical wheel built on native scroll plus CSS scroll-snap.
@@ -24,13 +23,18 @@ export function Wheel({
   onChange,
   label,
   disabled = false,
+  rows = 4,
 }: {
   items: WheelItem[]
   value: number
   onChange: (v: number) => void
   label: string
   disabled?: boolean
+  /** Visible height in rows: 4 normally, 3 on short screens. */
+  rows?: 3 | 4
 }) {
+  const viewportH = rows * ITEM_H
+  const edgeH = viewportH / 2 - ITEM_H / 2
   const ref = useRef<HTMLDivElement>(null)
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastEmitted = useRef(value)
@@ -88,7 +92,7 @@ export function Wheel({
     >
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-x-2 top-1/2 z-0 h-10 -translate-y-1/2 rounded-xl border border-primary/25 bg-primary/5"
+        className="pointer-events-none absolute inset-x-1.5 top-1/2 z-0 h-10 -translate-y-1/2 rounded-xl border border-border"
       />
       <span
         aria-hidden
@@ -105,8 +109,8 @@ export function Wheel({
         tabIndex={disabled ? -1 : 0}
         role="listbox"
         aria-label={label}
-        className="relative z-10 scrollbar-none h-40 snap-y snap-mandatory overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-ring"
-        style={{ paddingTop: EDGE_H, paddingBottom: EDGE_H }}
+        className="relative z-10 scrollbar-none snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        style={{ height: viewportH, paddingTop: edgeH, paddingBottom: edgeH }}
       >
         {items.map((it, i) => {
           const selected = i === index
@@ -116,11 +120,16 @@ export function Wheel({
               role="option"
               aria-selected={selected}
               className={cn(
-                'mx-2 flex h-10 snap-center items-center justify-center rounded-xl text-base tabular-nums transition-[color,background-color,transform,box-shadow] duration-150',
+                'mx-1.5 flex h-10 snap-center items-center justify-center rounded-xl text-base tabular-nums transition-[color,background-color,box-shadow] duration-150',
                 selected
-                  ? 'relative z-10 scale-105 bg-primary/10 font-bold text-primary shadow-sm ring-1 ring-inset ring-primary/30'
-                  : 'text-muted-foreground',
-                it.tone,
+                  ? it.tone === 'minor'
+                    ? 'relative z-10 bg-minor-fill font-bold text-minor-fill-foreground shadow-soft'
+                    : 'relative z-10 bg-primary font-bold text-primary-foreground shadow-soft'
+                  : it.tone === 'minor'
+                    ? 'font-medium text-minor'
+                    : it.tone === 'threshold'
+                      ? 'font-semibold text-foreground underline decoration-primary decoration-2 underline-offset-4'
+                      : 'text-muted-foreground',
               )}
             >
               {it.label}

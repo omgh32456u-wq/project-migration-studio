@@ -49,17 +49,17 @@ export function StepTransition({ stepKey, dir, children }: { stepKey: string | n
       }
 
   return (
-    <div className="relative">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       {snapshot && (
         <div
           key={`snap-${snapshot.key}`}
-          className="pointer-events-none absolute inset-0 z-10"
+          className="pointer-events-none absolute inset-0 z-10 flex flex-col roomy:justify-center"
           style={{ animation: 'step-exit 180ms ease-out both' }}
         >
           {snapshot.node}
         </div>
       )}
-      <div key={stepKey} style={enter}>
+      <div key={stepKey} style={enter} className="flex min-h-0 flex-1 flex-col roomy:justify-center">
         {children}
       </div>
     </div>

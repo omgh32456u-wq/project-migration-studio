@@ -8,6 +8,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Viewport-height variants so onboarding can compact itself instead of scrolling. */
+@custom-variant short (@media (max-height: 719px));
+@custom-variant tiny (@media (max-height: 600px));
+@custom-variant landscape-short (@media (orientation: landscape) and (max-height: 540px));
+@custom-variant roomy (@media (min-width: 768px) and (min-height: 720px));
+
 /* shadcn base-ui variants (inlined from shadcn/tailwind.css) */
 @theme inline {
   @keyframes accordion-down {
@@ -120,6 +126,11 @@
   --color-hero-carbs: var(--hero-carbs);
   --color-hero-fat: var(--hero-fat);
   --color-warning: var(--warning);
+  --color-minor: var(--minor);
+  --color-minor-fill: var(--minor-fill);
+  --color-minor-fill-foreground: var(--minor-fill-foreground);
+  --color-brand-lime: var(--brand-lime);
+  --color-brand-lime-foreground: var(--brand-lime-foreground);
   --color-warning-foreground: var(--warning-foreground);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
@@ -211,6 +222,13 @@
   --fat: oklch(0.6 0.145 36);
   --warning: oklch(0.96 0.05 85);
   --warning-foreground: oklch(0.42 0.09 65);
+  /* Under-18 ages (15–17): amber, never green. --minor is text on surfaces; -fill is a selected chip. */
+  --minor: oklch(0.56 0.13 62);
+  --minor-fill: oklch(0.8 0.15 78);
+  --minor-fill-foreground: oklch(0.26 0.06 60);
+  /* Lime from the logo's second stroke. */
+  --brand-lime: oklch(0.86 0.2 125);
+  --brand-lime-foreground: oklch(0.3 0.07 150);
   --chart-1: var(--energy);
   --chart-2: var(--protein);
   --chart-3: var(--carbs);
@@ -263,6 +281,11 @@
   --fat: oklch(0.73 0.13 35);
   --warning: oklch(0.3 0.05 75);
   --warning-foreground: oklch(0.88 0.09 85);
+  --minor: oklch(0.83 0.14 80);
+  --minor-fill: oklch(0.8 0.15 78);
+  --minor-fill-foreground: oklch(0.22 0.05 60);
+  --brand-lime: oklch(0.88 0.19 125);
+  --brand-lime-foreground: oklch(0.26 0.06 150);
 
   --hero-from: oklch(0.33 0.065 163);
   --hero-to: oklch(0.235 0.045 168);
@@ -328,4 +351,11 @@
     radial-gradient(22rem 14rem at 100% 0%, oklch(1 0 0 / 10%), transparent 65%),
     linear-gradient(155deg, var(--hero-from), var(--hero-to));
   border: 1px solid oklch(1 0 0 / 8%);
+}
+
+/* Theme switch ripple: the new theme is revealed by a circle growing from the toggle (see theme-toggle.tsx). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }

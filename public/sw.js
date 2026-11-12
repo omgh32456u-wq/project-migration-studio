@@ -1,10 +1,10 @@
 /* Mizano service worker: offline app shell, no user data is cached here (data lives in IndexedDB). */
 // v3: Lovable build — routes have no trailing slash and hashed build assets live under /assets/.
-const VERSION = 'tmm-v3'
+const VERSION = 'tmm-v4'
 const SHELL_CACHE = `${VERSION}-shell`
 const ASSET_CACHE = `${VERSION}-assets`
 const SHELL_ROUTES = ['/', '/foods', '/progress', '/settings']
-const PRECACHE = [...SHELL_ROUTES, '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icon.svg']
+const PRECACHE = [...SHELL_ROUTES, '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/favicon.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

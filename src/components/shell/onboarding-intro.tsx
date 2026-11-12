@@ -8,7 +8,10 @@ import { useStore } from '@/components/providers/app-store'
 import { usePrefersReducedMotion } from './onboarding-growths'
 import { armOnceOnGesture, playOpeningTone, stopOpeningTone } from './onboarding-sound'
 
-/** One-time brand reveal with an optional, persistent opening-sound control. */
+/**
+ * One-time brand reveal (fixed overlay) plus the opening-sound toggle, which renders inline
+ * where this component is placed (the onboarding header).
+ */
 export function OnboardingIntro() {
   const reduced = usePrefersReducedMotion()
   const { t } = useStore().i18n
@@ -78,13 +81,12 @@ export function OnboardingIntro() {
           </div>
         </div>
       )}
-      <div className="pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] end-4 z-[60]">
-        <Button
+      <Button
           type="button"
           variant="outline"
           size="icon"
           data-onboarding-sound-toggle
-          className="pointer-events-auto rounded-full bg-card/95 shadow-soft backdrop-blur"
+          className="size-11 rounded-full bg-card shadow-soft"
           aria-label={t(muted ? 'intro.unmute' : 'intro.mute')}
           aria-pressed={muted}
           title={t(muted ? 'intro.unmute' : 'intro.mute')}
@@ -92,7 +94,6 @@ export function OnboardingIntro() {
         >
           {muted ? <VolumeX aria-hidden /> : <Volume2 aria-hidden />}
         </Button>
-      </div>
     </>
   )
 }

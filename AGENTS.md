@@ -37,3 +37,5 @@ use the editor.
 - Capacitor plugins are only lazy-imported behind `isNativeApp()` in `src/lib/native.ts`. Why: the web build must never load native code; they exist for the Android shell's share sheet.
 - Bump `VERSION` in `public/sw.js` whenever cached routes or asset paths change. Why: old caches are dropped only on a version change.
 - tsconfig keeps `strict` but disables `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess` and `noPropertyAccessFromIndexSignature`. Why: the imported, tested code was written against plain strict mode.
+- Onboarding is pinned to the viewport (fixed, h-dvh, no scrolling); steps compact via the `short`/`tiny`/`landscape-short`/`roomy` height variants in `src/styles.css`. Why: no onboarding step may ever scroll on any supported device.
+- The logo lives only in `BrandMark` (CDN asset pointer) plus the real icon files in `public/`; change brand placements through `BrandMark`. Why: one source of truth for every true brand spot.

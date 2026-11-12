@@ -1,17 +1,17 @@
-
 import { useCallback, useState } from 'react'
 import { useStore } from '@/components/providers/app-store'
 import { useAction } from '@/components/providers/use-action'
 import { OnboardingLayout } from './onboarding-layout'
+import { OnboardingHeader } from './onboarding-header'
 import { StepTransition } from './onboarding-transition'
 import { AuthStep } from './onboarding-auth'
 import { ProfileWheelsPanel } from './onboarding-wheels-panel'
 import { WelcomePanel } from './onboarding-welcome'
-import { DayStartStep } from './onboarding-step-daystart'
 import { growthState } from './onboarding-growths'
 import type { Locale, Profile, ThemePref } from '@/lib/types'
 
-export const TOTAL_STEPS = 4
+/** Auth -> Welcome -> Profile (day start lives inside Profile). */
+export const TOTAL_STEPS = 3
 
 export function Onboarding() {
   const store = useStore()
@@ -38,21 +38,19 @@ export function Onboarding() {
     },
     [step],
   )
-
   const next = useCallback(() => {
-    if (step < 3) go(step + 1)
-  }, [step, go])
+    if (step < total - 1) go(step + 1)
+  }, [step, go, total])
 
   const api = { step, dir, settings, t, setPref, setStep: go, setDayStart, onSetProfile, finish, next }
   const growth = growthState(step, total)
 
   return (
-    <OnboardingLayout step={step} total={total} growth={growth}>
+    <OnboardingLayout growth={growth} header={<OnboardingHeader step={step} total={total} settings={settings} setPref={setPref} t={t} />}>
       <StepTransition stepKey={step} dir={dirMotion}>
-        {step === 0 && <AuthStep onSkip={() => go(1)} />}
-        {step === 1 && <WelcomePanel api={api} />}
-        {step === 2 && <DayStartStep api={api} />}
-        {step === 3 && <ProfileWheelsPanel api={api} />}
+        {step === 0 && <AuthStep api={api} onSkip={() => go(1)} />}
+        {step === 1 && <WelcomePanel api={api} growth={growth} />}
+        {step === 2 && <ProfileWheelsPanel api={api} />}
       </StepTransition>
     </OnboardingLayout>
   )

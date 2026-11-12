@@ -14,6 +14,12 @@ export const enExtra = {
   'onboarding.age.under18': 'Under 18 — personal energy targets stay off for now.',
   'intro.mute': 'Mute opening sound',
   'intro.unmute': 'Play opening sound',
+  'theme.toDark': 'Switch to dark theme',
+  'theme.toLight': 'Switch to light theme',
+  'onboarding.point.foods': 'Egyptian and everyday foods built in',
+  'onboarding.point.lang': 'Full Arabic and English',
+  'onboarding.point.offline': 'Works offline, no account needed',
+  'onboarding.dayStart.short': 'My day starts at',
 } as const
 
 export type ExtraKey = keyof typeof enExtra

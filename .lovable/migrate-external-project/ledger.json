@@ -1,0 +1,131 @@
+{
+  "source": "code-archive (Next.js 16 static export + Capacitor Android shell, deployed on Vercel)",
+  "capabilities": [
+    {
+      "capability": "code",
+      "source": "Next.js app router: /, /foods, /progress, /settings; 60 client components; base-ui shadcn kit",
+      "outcome": "migrate to TanStack Start routes",
+      "status": "verified",
+      "next_action": "none \u2014 4 pages ported to TanStack routes; build and typecheck clean"
+    },
+    {
+      "capability": "schema",
+      "source": "Browser IndexedDB 'track-meals-macros' (foods, logs, recipes, savedMeals, weights, meta); no server database",
+      "outcome": "preserve on-device storage unchanged (app is deliberately private, offline, guest-only)",
+      "status": "verified",
+      "next_action": "none \u2014 IndexedDB layer copied unchanged; storage tests pass; log persisted across reload in browser"
+    },
+    {
+      "capability": "records",
+      "source": "Per-device IndexedDB on the old domain; no server records exist",
+      "outcome": "users carry data across with the app's own backup export/import (Settings > Data)",
+      "status": "pending_user",
+      "next_action": "existing users export a backup on the old site and import it on the new one"
+    },
+    {
+      "capability": "auth identities",
+      "source": "None: onboarding sign-in buttons show an honest 'not available' notice; guest-only",
+      "outcome": "no users to migrate; keep guest flow as-is",
+      "status": "not_applicable",
+      "next_action": "none"
+    },
+    {
+      "capability": "authorization",
+      "source": "None (single-user local data)",
+      "outcome": "not applicable",
+      "status": "not_applicable",
+      "next_action": "none"
+    },
+    {
+      "capability": "uploaded file bytes",
+      "source": "None",
+      "outcome": "not applicable",
+      "status": "not_applicable",
+      "next_action": "none"
+    },
+    {
+      "capability": "fonts",
+      "source": "next/font IBM Plex Sans Arabic",
+      "outcome": "Google Fonts link in root head",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "PWA (manifest, service worker, offline shell)",
+      "source": "app/manifest.ts, public/sw.js",
+      "outcome": "static manifest + adapted service worker",
+      "status": "migrated",
+      "next_action": "service worker registers only on the published site; check install/offline after publishing"
+    },
+    {
+      "capability": "reminders (browser notifications)",
+      "source": "lib/reminders.ts, reminder-runner",
+      "outcome": "migrate unchanged",
+      "status": "migrated",
+      "next_action": "reminder tests pass; notification permission prompt needs a real device to confirm"
+    },
+    {
+      "capability": "backup export/share",
+      "source": "lib/backup.ts + Capacitor Filesystem/Share in native shell",
+      "outcome": "migrate unchanged; Capacitor plugins kept as lazy imports",
+      "status": "verified",
+      "next_action": "none \u2014 JSON backup download confirmed in browser"
+    },
+    {
+      "capability": "security headers",
+      "source": "vercel.json headers",
+      "outcome": "set in server entry",
+      "status": "migrated",
+      "next_action": "confirm on published site (static files may be served by hosting without them; sw.js no-cache header not controllable)"
+    },
+    {
+      "capability": "external providers",
+      "source": "@vercel/analytics listed in package.json but never imported",
+      "outcome": "dropped (unused, Vercel-only)",
+      "status": "accepted",
+      "next_action": "none"
+    },
+    {
+      "capability": "Android APK (Capacitor shell + GitHub Actions)",
+      "source": "android/, capacitor.config.json, .github/workflows/android-apk.yml packaging Next static 'out/'",
+      "outcome": "not carried into Lovable: Lovable hosts the web app, it cannot build APKs and has no static out/ folder",
+      "status": "pending_user",
+      "next_action": "user decides: keep building APK from old repo, or point Capacitor at the published Lovable URL"
+    },
+    {
+      "capability": "public endpoints / webhooks / schedules / callbacks",
+      "source": "None",
+      "outcome": "not applicable",
+      "status": "not_applicable",
+      "next_action": "none"
+    },
+    {
+      "capability": "secrets",
+      "source": "None (only NODE_ENV)",
+      "outcome": "not applicable",
+      "status": "not_applicable",
+      "next_action": "none"
+    },
+    {
+      "capability": "tests",
+      "source": "9 vitest suites in tests/",
+      "outcome": "migrate into src/test",
+      "status": "verified",
+      "next_action": "none \u2014 80/80 pass"
+    },
+    {
+      "capability": "cutover",
+      "source": "Vercel deployment",
+      "outcome": "publish on Lovable; old domain keeps users' local data until they export it",
+      "status": "pending_user",
+      "next_action": "publish, then retire Vercel after users move data"
+    },
+    {
+      "capability": "verification",
+      "source": "-",
+      "outcome": "build, tests, browser walkthrough",
+      "status": "verified",
+      "next_action": "onboarding, add food, reload persistence, all pages, Arabic RTL, backup export, desktop layout checked"
+    }
+  ]
+}

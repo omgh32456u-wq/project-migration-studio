@@ -3,6 +3,7 @@ import { Link, useLocation } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { AlertTriangle, BookOpen, CalendarDays, ChartColumn, Settings } from 'lucide-react'
 import { BrandMark } from '@/components/common/brand-mark'
+import { LoadingMark } from '@/components/common/loading-mark'
 import { useStore } from '@/components/providers/app-store'
 import type { MessageKey } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -24,16 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useLocation({ select: (l) => l.pathname })
   const { t } = store.i18n
 
-  if (store.status === 'loading') {
-    return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4" role="status" aria-live="polite">
-        <div className="relative">
-                    <BrandMark className="relative size-16 animate-fade-in" />
-        </div>
-        <p className="animate-fade-in text-sm text-muted-foreground">{t('common.loading')}</p>
-      </div>
-    )
-  }
+  if (store.status === 'loading') return <LoadingMark label={t('common.loading')} className="min-h-dvh" />
 
   if (store.status === 'error' || store.status === 'blocked' || store.status === 'stale') {
     const message = store.status === 'blocked' ? 'data.blocked' : store.status === 'stale' ? 'data.versionChanged' : 'common.error'

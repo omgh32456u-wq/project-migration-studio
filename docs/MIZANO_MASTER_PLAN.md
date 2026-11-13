@@ -108,7 +108,7 @@ Requirements:
 
 ### Day Start and daily boundary
 - Add/retain a user-configurable day-start time.
-- Explain clearly that entries before the chosen day start count toward the previous tracking day.
+- Explain clearly that entries before the chosen day start count toward the previous tracking day. — Settings already explained it; onboarding did not (defect found 2026-11-13). Fixed: a short note under the onboarding Day Start row, also the input's accessible description; regression test in `loading-mark.test.tsx`.
 - Allow the user to edit this setting later in Settings.
 - Ensure food and macro entries do not disappear or reset incorrectly at midnight. The tracking-day key must respect the configured day boundary, including late-night/gym use.
 - Test before/after the day-start boundary, midnight, timezone changes where practical, and historical days.
@@ -124,6 +124,8 @@ Agreed concept (not to be confused with the current ordinary full-logo loading s
 - Keep motion smooth, calm, and consistent wherever the app displays a loading state, including future Mizo assistant loading.
 - Respect reduced-motion preferences and avoid unnecessary CPU/battery load.
 - Remove the old plant animation and all plant loading references.
+
+**Status (2026-11-13, Phase 1 Task 6): Implemented / verified in browser preview only.** `LoadingMark` (`src/components/common/loading-mark.tsx`) renders `BrandMark variant="outline" animated`: the two arches measured from the official 1024px artwork (traced outline matched the logo exactly when overlaid), contours only, lime arch masked where the white arch covers it, so the halves join at the top of the shared middle leg exactly as in the logo. Animation: one CSS transform (`m-turn`, 2.8 s, eased per half-turn) turns the whole plane 360° around the shared leg, so the halves swap sides and back without separating. Colours via `--mark-a`/`--mark-b`/`--mark-b-edge` tokens (Light: deep-green arch + lime arch with green casing; Dark: white + lime). Runs only under `motion-safe`; reduced motion shows the static outline. The visible "Loading your data…" text was removed; it remains as the screen-reader status label. The only true app-loading state today is the AppShell data-loading screen, now replaced; no other loading presentations exist (future Mizo loading should reuse `LoadingMark`).
 
 ### Screen transitions
 - Card-to-card navigation should feel like the incoming card smoothly pushes the previous card sideways.
@@ -315,6 +317,10 @@ Record anything not tested explicitly as **unverified**.
 
 - **2026-11-13:** Phase 1 Task 4 (onboarding selection states) — Implemented / verified in browser preview only. Diagnosis: in the current 3-step flow, the tap controls (EN/AR, theme button, sex, activity) already updated `aria-checked` and their filled style immediately (25–60 ms in the sandbox browser; saving to the device took ~5 ms). The one reproduced defect was the age/height/weight wheels: while turning, the highlight stayed on the old number and slid away from the centre band until scrolling paused and the value was saved. Fix: the wheel now highlights the row under the centre band live while turning and still saves only when it settles (`onboarding-wheel.tsx`). Evidence: new `onboarding-selection.test.tsx` (failed before, passes after), 83/83 tests, typecheck clean; Playwright at 390x844 and 800x1280, EN/AR, Light/Dark. Unverified: real phones/tablets (touch fling), and whether the user's original "frozen" report came from the older app.
 
+- **2026-11-13:** Phase 1 Task 5 (Day Start) — verification pass. Existing behaviour kept (no rewrite). Evidence: `nutrition-day.test.ts` 20/20 (boundaries, midnight, month/year/leap, DST, historical preservation); preview at 390x844 EN/Light and AR/Dark shows Day Start in its own muted box below Activity in onboarding and in Settings ("Nutrition day") with the previous-day rule, the 24-hour window and the never-moves-old-entries note. One defect: onboarding gave no explanation of the previous-day rule. Fixed with a one-line note (EN/AR) linked as the input's description; on short screens (≤719 px tall) the Profile intro sentence is hidden to keep the step scroll-free. Re-checked no scroll and no overlap of the Day Start box with the buttons at 360x640, 375x667, 390x720, 390x844, 844x390, 800x1280, 1024x768, 1280x800 in EN/Light and AR/Dark. Status: Implemented / verified in browser preview only; real devices unverified.
+
+- **2026-11-13:** Phase 1 Task 6 (M loading animation) — Implemented / verified in browser preview only. See section 6 status. Files: `src/components/common/brand-mark.tsx` (outline variant), `src/components/common/loading-mark.tsx` (new), `src/components/shell/app-shell.tsx`, `src/styles.css` (`m-turn` keyframes, `--mark-*` tokens). Evidence: 87/87 tests (new `loading-mark.test.tsx`), typecheck clean, build OK; Playwright with the data store held in its loading state: 390x844 EN Light/Dark and AR Light, 800x1280 EN Light, 1280x800 AR Dark — animation `m-turn` running, mark centred, no image tile, no page scroll, no console errors; frames sampled across the turn in Light and Dark show the swap with the halves joined; reduced motion (390x844 EN Dark, 1280x800 AR Light) shows the static outline with no animation. Unverified: real Android/tablet (smoothness, battery), screen-reader announcement on device.
+
 Append future decisions here with date, decision, reason, affected requirements, and whether it replaces an earlier decision.
 
 ## 18. Open verification items (do not assume complete)
@@ -323,8 +329,8 @@ Append future decisions here with date, decision, reason, affected requirements,
 - Confirm actual current logo artwork and extract its color values. — Done 2026-11-13 (sampled: deep #1e6337, mid #178258, lime #c3e828, white #eaf0ec).
 - Confirm standalone M mark exists and is used in the correct contexts. — Implemented / unverified in Arabic and tablet.
 - Confirm plant assets/references have been fully removed. — Done 2026-11-13 (code search clean).
-- Confirm loading animation matches the agreed partial-M concept (not just a static full logo).
-- Confirm Day Start persistence and late-night logging behavior.
+- Confirm loading animation matches the agreed partial-M concept (not just a static full logo). — Implemented 2026-11-13; browser preview checked (Light/Dark, EN/AR, phone/tablet/desktop, reduced motion). Real-device smoothness still open.
+- Confirm Day Start persistence and late-night logging behavior. — Logic covered by tests; UI checked in browser preview 2026-11-13 (onboarding + Settings, EN/AR). Real-device late-night use still open.
 - Confirm Add Food and Idea Wheel modal positioning from all entry points and viewport sizes.
 - Confirm Today macro card contrast in both themes.
 - Confirm date navigation ordering in English and Arabic.

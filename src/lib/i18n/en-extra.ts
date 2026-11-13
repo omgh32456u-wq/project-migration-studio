@@ -20,6 +20,7 @@ export const enExtra = {
   'onboarding.point.lang': 'Full Arabic and English',
   'onboarding.point.offline': 'Works offline, no account needed',
   'onboarding.dayStart.short': 'My day starts at',
+  'onboarding.dayStart.note': 'Food logged before this time counts toward the previous day.',
 } as const
 
 export type ExtraKey = keyof typeof enExtra

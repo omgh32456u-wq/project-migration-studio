@@ -17,6 +17,7 @@ export const arExtra = {
   'onboarding.point.lang': 'دعم كامل للعربية والإنجليزية',
   'onboarding.point.offline': 'يعمل دون إنترنت ودون حساب',
   'onboarding.dayStart.short': 'يبدأ يومي الساعة',
+  'onboarding.dayStart.note': 'الطعام المسجَّل قبل هذا الوقت يُحتسب ضمن اليوم السابق.',
 } as const
 
 export type ArExtraKey = keyof typeof arExtra

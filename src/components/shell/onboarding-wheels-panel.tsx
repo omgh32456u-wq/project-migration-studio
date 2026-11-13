@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useStore } from '@/components/providers/app-store'
 import { dayStartToTime, parseTimeInput } from '@/lib/nutrition-day'
 import type { MessageKey } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 import { Wheel, type WheelItem } from './onboarding-wheel'
 import { SexSelect, ActivitySelect } from './onboarding-pickers'
 import { StepActions, StepCard, StepHeader, type StepApi } from './onboarding-steps'
@@ -45,6 +46,45 @@ function Label({ children, aside }: { children: string; aside?: string }) {
 }
 
 /**
+ * Day-start row of the Profile step, kept in its own muted box apart from Activity. The note under it explains
+ * that food logged before this time counts toward the previous day (also the input's accessible description).
+ */
+export function OnboardingDayStart({
+  value,
+  onChange,
+  t,
+  className,
+}: {
+  value: number
+  onChange: (minutes: number) => void
+  t: (key: MessageKey) => string
+  className?: string
+}) {
+  const noteId = useId()
+  return (
+    <div className={cn('flex flex-col gap-0.5 rounded-2xl bg-muted px-3 py-1.5', className)}>
+      <label className="flex items-center justify-between gap-3">
+        <span className="min-w-0 text-sm font-medium">{t('onboarding.dayStart.short')}</span>
+        <input
+          type="time"
+          dir="ltr"
+          aria-describedby={noteId}
+          value={dayStartToTime(value)}
+          onChange={(e) => {
+            const m = parseTimeInput(e.target.value)
+            if (m !== null) onChange(m)
+          }}
+          className="h-10 w-32 shrink-0 rounded-lg border border-input bg-card px-2 text-sm tabular-nums outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+        />
+      </label>
+      <p id={noteId} className="pb-0.5 text-[11px] leading-snug text-muted-foreground">
+        {t('onboarding.dayStart.note')}
+      </p>
+    </div>
+  )
+}
+
+/**
  * Profile step (last step): age/height/weight wheels, sex, activity and the day-start time.
  * Laid out to fit without scrolling: one column normally, two columns on short landscape screens.
  */
@@ -72,19 +112,7 @@ export function ProfileWheelsPanel({ api }: { api: StepApi }) {
   const commitHeight = (h: number) => onSetProfile({ heightCm: h })
   const commitWeight = (w: number) => onSetProfile({ weightKg: Math.round(w) / 10 })
   const dayStart = (className: string) => (
-    <label className={'items-center justify-between gap-3 rounded-2xl bg-muted px-3 py-1.5 ' + className}>
-      <span className="min-w-0 text-sm font-medium">{t('onboarding.dayStart.short')}</span>
-      <input
-        type="time"
-        dir="ltr"
-        value={dayStartToTime(settings.dayStartMinutes)}
-        onChange={(e) => {
-          const m = parseTimeInput(e.target.value)
-          if (m !== null) api.setDayStart(m)
-        }}
-        className="h-10 w-32 shrink-0 rounded-lg border border-input bg-card px-2 text-sm tabular-nums outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
-      />
-    </label>
+    <OnboardingDayStart value={settings.dayStartMinutes} onChange={api.setDayStart} t={t} className={className} />
   )
   const actions = (className: string) => (
     <div className={className}>
@@ -103,7 +131,7 @@ export function ProfileWheelsPanel({ api }: { api: StepApi }) {
 
   return (
     <StepCard>
-      <StepHeader title={t('onboarding.profile')} hint={t('onboarding.profile.hint2')} className="landscape-short:hidden" />
+      <StepHeader title={t('onboarding.profile')} hint={t('onboarding.profile.hint2')} className="landscape-short:hidden short:[&>p]:hidden" />
 
       <div className="flex min-h-0 flex-col gap-3 landscape-short:grid landscape-short:grid-cols-2 landscape-short:gap-5">
         <div className="flex flex-col gap-2">

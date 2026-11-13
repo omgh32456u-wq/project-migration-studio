@@ -171,6 +171,22 @@
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
   --animate-rise: rise 0.55s var(--ease-soft) both;
   --animate-fade-in: fade-in 0.4s var(--ease-soft) both;
+  /* Loading M: one calm 360° turn around the shared middle leg, easing into each half-turn. */
+  --animate-m-turn: m-turn 2.8s linear infinite;
+
+  @keyframes m-turn {
+    0% {
+      transform: perspective(36em) rotateY(0deg);
+      animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+    }
+    50% {
+      transform: perspective(36em) rotateY(180deg);
+      animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+    }
+    100% {
+      transform: perspective(36em) rotateY(360deg);
+    }
+  }
 
   @keyframes rise {
     from {
@@ -230,6 +246,10 @@
   /* Lime from the logo's second stroke. */
   --brand-lime: #c3e828;
   --brand-lime-foreground: #1f2a10;
+  /* Outline M (loading): --mark-a = the logo's white arch, --mark-b = lime arch, --mark-b-edge = its casing. */
+  --mark-a: #1e6337;
+  --mark-b: #c3e828;
+  --mark-b-edge: #1e6337;
   --chart-1: var(--energy);
   --chart-2: var(--protein);
   --chart-3: var(--carbs);
@@ -287,6 +307,9 @@
   --minor-fill-foreground: oklch(0.22 0.05 60);
   --brand-lime: #c3e828;
   --brand-lime-foreground: #1f2a10;
+  --mark-a: #eaf0ec;
+  --mark-b: #c3e828;
+  --mark-b-edge: transparent;
 
   --hero-from: #1c5a33;
   --hero-to: #112a1b;

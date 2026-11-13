@@ -5,7 +5,7 @@ import { BrandMark } from '@/components/common/brand-mark'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/components/providers/app-store'
-import { usePrefersReducedMotion } from './onboarding-growths'
+import { usePrefersReducedMotion } from '@/hooks/use-reduced-motion'
 import { armOnceOnGesture, playOpeningTone, stopOpeningTone } from './onboarding-sound'
 
 /**

@@ -94,7 +94,7 @@ export function DaySummary({ totals }: { totals: Totals }) {
             const goal = targets?.grams[k]
             const pct = goal ? Math.min((value / goal) * 100, 100) : macroKcal > 0 ? ((value * KCAL_PER_GRAM[k]) / macroKcal) * 100 : 0
             return (
-              <div key={k} className="flex min-w-0 flex-col gap-2 rounded-2xl bg-white/[0.07] p-3 ring-1 ring-white/10">
+              <div key={k} className="flex min-w-0 flex-col gap-2 rounded-2xl bg-hero-foreground/[0.07] p-3 ring-1 ring-hero-foreground/10">
                 <dt className="flex items-center gap-1.5 text-xs font-medium text-hero-muted">
                   <span className={cn('size-2 shrink-0 rounded-full', heroFill[k])} aria-hidden />
                   <span className="truncate">{t(`nutrient.${k}`)}</span>

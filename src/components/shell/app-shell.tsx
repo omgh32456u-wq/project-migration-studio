@@ -28,8 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4" role="status" aria-live="polite">
         <div className="relative">
-          <span className="absolute inset-0 animate-ping rounded-[28%] bg-primary/25 motion-reduce:hidden" aria-hidden />
-          <BrandMark className="relative size-16 shadow-lift" />
+                    <BrandMark className="relative size-16 animate-fade-in" />
         </div>
         <p className="animate-fade-in text-sm text-muted-foreground">{t('common.loading')}</p>
       </div>

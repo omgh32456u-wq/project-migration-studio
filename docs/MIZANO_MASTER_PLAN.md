@@ -311,14 +311,16 @@ Record anything not tested explicitly as **unverified**.
 - **2026-11-13:** One coherent logo-led visual identity is mandatory; Light/Dark must be intentionally designed; defer Liquid Glass until foundations are stable.
 - **2026-11-13:** Approved working branch is `development/mizano-roadmap`. Keep `main` stable; all implementation and plan updates for this work go to the development branch until the user reviews and explicitly approves a merge.
 
+- **2026-11-13:** Phase 1 Task 1 (identity) — Implemented / partially verified. Palette from the logo: primary #1e6337 (dark theme #4fbf7f), mid green #178258 (energy), lime #c3e828 as fills only with dark text #1f2a10, neutral surfaces #f7f8f5/#ffffff (dark #121614/#1a201c). Standalone M cut from the official artwork (not redrawn): Light = deep-green arch + lime arch with thin green outline (user choice); Dark = original white + lime arches. Square tile kept only for favicon/PWA/app icons. Plant/leaf artwork and growth states removed; background gradients removed. Evidence: 79/79 tests, build OK, preview onboarding checked at 390x844 and 1280x800 in Light and Dark (EN). Unverified: Arabic, tablet, Today/Foods/Progress/Settings after the palette change, real devices. Outlined M for the loading animation remains a later task.
+
 Append future decisions here with date, decision, reason, affected requirements, and whether it replaces an earlier decision.
 
 ## 18. Open verification items (do not assume complete)
 
 - Confirm current onboarding selection visuals in the latest preview.
-- Confirm actual current logo artwork and extract its color values.
-- Confirm standalone M mark exists and is used in the correct contexts.
-- Confirm plant assets/references have been fully removed.
+- Confirm actual current logo artwork and extract its color values. — Done 2026-11-13 (sampled: deep #1e6337, mid #178258, lime #c3e828, white #eaf0ec).
+- Confirm standalone M mark exists and is used in the correct contexts. — Implemented / unverified in Arabic and tablet.
+- Confirm plant assets/references have been fully removed. — Done 2026-11-13 (code search clean).
 - Confirm loading animation matches the agreed partial-M concept (not just a static full logo).
 - Confirm Day Start persistence and late-night logging behavior.
 - Confirm Add Food and Idea Wheel modal positioning from all entry points and viewport sizes.

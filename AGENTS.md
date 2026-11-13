@@ -38,4 +38,4 @@ use the editor.
 - Bump `VERSION` in `public/sw.js` whenever cached routes or asset paths change. Why: old caches are dropped only on a version change.
 - tsconfig keeps `strict` but disables `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess` and `noPropertyAccessFromIndexSignature`. Why: the imported, tested code was written against plain strict mode.
 - Onboarding is pinned to the viewport (fixed, h-dvh, no scrolling); steps compact via the `short`/`tiny`/`landscape-short`/`roomy` height variants in `src/styles.css`. Why: no onboarding step may ever scroll on any supported device.
-- The logo lives only in `BrandMark` (CDN asset pointer) plus the real icon files in `public/`; change brand placements through `BrandMark`. Why: one source of truth for every true brand spot.
+- The logo lives only in `BrandMark` (`mark` = standalone M with light/dark variants, `tile` = square app-icon art) plus the real icon files in `public/`; change brand placements through `BrandMark`. Why: one source of truth for every true brand spot.

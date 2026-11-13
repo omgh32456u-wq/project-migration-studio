@@ -129,7 +129,7 @@ export function Chip({ active, className, ...props }: ComponentProps<'button'> &
   )
 }
 
-/** Base surface. `hero` is the deep-fern gradient used for the Today summary; `flat` drops the shadow for nested cards. */
+/** Base surface. `hero` is the deep logo-green gradient used for the Today summary; `flat` drops the shadow for nested cards. */
 export function Card({ className, variant = 'default', ...props }: ComponentProps<'section'> & { variant?: 'default' | 'hero' | 'flat' }) {
   return (
     <section

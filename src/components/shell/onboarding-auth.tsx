@@ -2,7 +2,6 @@ import { useState, type ReactNode } from 'react'
 import { Mail, ShieldCheck, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { OnboardingPlant } from './onboarding-plant'
 import { StepCard, StepHeader, type StepApi } from './onboarding-steps'
 
 /** Brand-coloured icon tile (not the providers' own colours). */
@@ -54,10 +53,6 @@ export function AuthStep({ api, onSkip }: { api: StepApi; onSkip: () => void }) 
         </p>
       )}
 
-      {/* Growth illustration fills spare height on phones only; hidden where space is tight or on desktop (shown in the side column). */}
-      <div aria-hidden className="flex min-h-0 flex-1 items-center justify-center short:hidden roomy:hidden lg:hidden">
-        <OnboardingPlant state="seed" className="h-full max-h-36 w-auto text-primary" />
-      </div>
 
       <div className="mt-auto flex shrink-0 flex-col gap-2 roomy:mt-2">
         <Button size="lg" onClick={onSkip}>

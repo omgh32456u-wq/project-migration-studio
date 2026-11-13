@@ -1,6 +1,6 @@
 /* Mizano service worker: offline app shell, no user data is cached here (data lives in IndexedDB). */
 // v3: Lovable build — routes have no trailing slash and hashed build assets live under /assets/.
-const VERSION = 'tmm-v4'
+const VERSION = 'tmm-v5'
 const SHELL_CACHE = `${VERSION}-shell`
 const ASSET_CACHE = `${VERSION}-assets`
 const SHELL_ROUTES = ['/', '/foods', '/progress', '/settings']

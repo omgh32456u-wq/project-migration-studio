@@ -1,11 +1,10 @@
 import { Languages, UtensilsCrossed, WifiOff } from 'lucide-react'
+import { BrandMark } from '@/components/common/brand-mark'
 import { Button } from '@/components/ui/button'
-import { OnboardingPlant } from './onboarding-plant'
-import type { GrowthState } from './onboarding-growths'
 import { NextArrow, StepActions, StepCard, StepHeader, type StepApi } from './onboarding-steps'
 
 /** Welcome: what Mizano is. Language/theme live in the persistent header, not here. */
-export function WelcomePanel({ api, growth }: { api: StepApi; growth: GrowthState }) {
+export function WelcomePanel({ api }: { api: StepApi }) {
   const { t } = api
   const points = [
     { icon: UtensilsCrossed, text: t('onboarding.point.foods') },
@@ -14,7 +13,7 @@ export function WelcomePanel({ api, growth }: { api: StepApi; growth: GrowthStat
   ]
   return (
     <StepCard>
-      <OnboardingPlant state={growth} className="mx-auto h-28 w-auto shrink-0 text-primary sm:h-32 short:hidden lg:hidden" />
+      <BrandMark className="mx-auto size-20 sm:size-24 short:hidden lg:hidden" />
       <StepHeader title={t('onboarding.welcome')} hint={t('onboarding.intro')} />
       <ul className="flex shrink-0 flex-col gap-2">
         {points.map(({ icon: Icon, text }) => (

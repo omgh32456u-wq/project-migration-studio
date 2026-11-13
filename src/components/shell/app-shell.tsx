@@ -1,11 +1,12 @@
 
 import { Link, useLocation } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { AlertTriangle, BookOpen, CalendarDays, ChartColumn, Settings } from 'lucide-react'
 import { BrandMark } from '@/components/common/brand-mark'
 import { LoadingMark } from '@/components/common/loading-mark'
 import { useStore } from '@/components/providers/app-store'
-import type { MessageKey } from '@/lib/i18n'
+import { createTranslator, type MessageKey } from '@/lib/i18n'
+import type { Locale } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Onboarding } from './onboarding'
 
@@ -24,8 +25,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const store = useStore()
   const pathname = useLocation({ select: (l) => l.pathname })
   const { t } = store.i18n
+  // While data opens, settings are still defaults; the saved language is already on <html lang> (boot script).
+  // Read it after hydration so the visible message is in the user's language and server markup still matches.
+  const [bootLocale, setBootLocale] = useState<Locale | null>(null)
+  useEffect(() => setBootLocale(document.documentElement.lang === 'ar' ? 'ar' : 'en'), [])
 
-  if (store.status === 'loading') return <LoadingMark label={t('common.loading')} className="min-h-dvh" />
+  if (store.status === 'loading') {
+    const label = bootLocale ? createTranslator(bootLocale).t('common.loading') : ''
+    return <LoadingMark label={label} className="min-h-dvh" />
+  }
 
   if (store.status === 'error' || store.status === 'blocked' || store.status === 'stale') {
     const message = store.status === 'blocked' ? 'data.blocked' : store.status === 'stale' ? 'data.versionChanged' : 'common.error'

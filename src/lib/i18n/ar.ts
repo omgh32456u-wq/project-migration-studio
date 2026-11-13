@@ -24,7 +24,7 @@ export const ar: Record<MessageKey, string> = {
   'common.next': 'متابعة',
   'common.search': 'بحث',
   'common.optional': 'اختياري',
-  'common.loading': 'جارٍ تحميل بياناتك…',
+  'common.loading': 'تحميل بياناتك…',
   'common.unknown': 'غير معروف',
   'common.remove': 'إزالة',
   'common.rename': 'إعادة تسمية',

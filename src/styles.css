@@ -171,20 +171,88 @@
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
   --animate-rise: rise 0.55s var(--ease-soft) both;
   --animate-fade-in: fade-in 0.4s var(--ease-soft) both;
-  /* Loading M: one calm 360° turn around the shared middle leg, easing into each half-turn. */
-  --animate-m-turn: m-turn 2.8s linear infinite;
+  /*
+   * Loading M: the two halves turn separately around the shared hinge (rotateY 0→180→360 each). Per swap the
+   * left half leads (swinging forward), the right half follows 0.4 s behind (swinging back), so the halves open
+   * into a turning V instead of folding flat; each swap takes 1.7 s and the M then rests 0.7 s.
+   * While the halves pass each other they also swing a little (individual `rotate`, applied after the turn) around
+   * the same upper joint, each leaning towards where it is heading, so they stay two distinct shapes instead of
+   * reading as one arch. Every rotation pivots on the joint, so the halves never separate there.
+   * White keeps a 1px lead in depth so it sits in front of the lime half at rest, as in the logo.
+   */
+  --ease-m-turn: cubic-bezier(0.37, 0, 0.63, 1);
+  --animate-m-half-a: m-half-a 4.8s linear infinite, m-splay-a 4.8s linear infinite;
+  --animate-m-half-b: m-half-b 4.8s linear infinite, m-splay-b 4.8s linear infinite;
 
-  @keyframes m-turn {
-    0% {
-      transform: perspective(36em) rotateY(0deg);
-      animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  @keyframes m-half-a {
+    0%,
+    6% {
+      transform: translateZ(1px) rotateY(0deg);
+      animation-timing-function: var(--ease-m-turn);
     }
-    50% {
-      transform: perspective(36em) rotateY(180deg);
-      animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+    33.1%,
+    64.3% {
+      transform: translateZ(1px) rotateY(180deg);
+      animation-timing-function: var(--ease-m-turn);
     }
+    91.4%,
     100% {
-      transform: perspective(36em) rotateY(360deg);
+      transform: translateZ(1px) rotateY(360deg);
+    }
+  }
+  @keyframes m-half-b {
+    0%,
+    14.3% {
+      transform: rotateY(0deg);
+      animation-timing-function: var(--ease-m-turn);
+    }
+    41.4%,
+    56% {
+      transform: rotateY(180deg);
+      animation-timing-function: var(--ease-m-turn);
+    }
+    83.1%,
+    100% {
+      transform: rotateY(360deg);
+    }
+  }
+
+  @keyframes m-splay-a {
+    0%,
+    12.5%,
+    34.4%,
+    62.5%,
+    84.4%,
+    100% {
+      rotate: 0deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+    23.7% {
+      rotate: -18deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+    73.7% {
+      rotate: 18deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+  }
+  @keyframes m-splay-b {
+    0%,
+    12.5%,
+    34.4%,
+    62.5%,
+    84.4%,
+    100% {
+      rotate: 0deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+    23.7% {
+      rotate: 18deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+    73.7% {
+      rotate: -18deg;
+      animation-timing-function: var(--ease-m-turn);
     }
   }
 
@@ -246,7 +314,9 @@
   /* Lime from the logo's second stroke. */
   --brand-lime: #c3e828;
   --brand-lime-foreground: #1f2a10;
-  /* Outline M (loading): --mark-a = the logo's white arch, --mark-b = lime arch, --mark-b-edge = its casing. */
+  /* Outline M (loading): --mark-a = the logo's white arch, --mark-b = lime arch, --mark-b-edge = its casing,
+     --mark-fill = the surface the mark sits on (hides the half behind; override on non-background surfaces). */
+  --mark-fill: var(--background);
   --mark-a: #1e6337;
   --mark-b: #c3e828;
   --mark-b-edge: #1e6337;

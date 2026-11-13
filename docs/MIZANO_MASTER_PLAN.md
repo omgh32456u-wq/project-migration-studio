@@ -313,11 +313,13 @@ Record anything not tested explicitly as **unverified**.
 
 - **2026-11-13:** Phase 1 Task 1 (identity) — Implemented / partially verified. Palette from the logo: primary #1e6337 (dark theme #4fbf7f), mid green #178258 (energy), lime #c3e828 as fills only with dark text #1f2a10, neutral surfaces #f7f8f5/#ffffff (dark #121614/#1a201c). Standalone M cut from the official artwork (not redrawn): Light = deep-green arch + lime arch with thin green outline (user choice); Dark = original white + lime arches. Square tile kept only for favicon/PWA/app icons. Plant/leaf artwork and growth states removed; background gradients removed. Evidence: 79/79 tests, build OK, preview onboarding checked at 390x844 and 1280x800 in Light and Dark (EN). Unverified: Arabic, tablet, Today/Foods/Progress/Settings after the palette change, real devices. Outlined M for the loading animation remains a later task.
 
+- **2026-11-13:** Phase 1 Task 4 (onboarding selection states) — Implemented / verified in browser preview only. Diagnosis: in the current 3-step flow, the tap controls (EN/AR, theme button, sex, activity) already updated `aria-checked` and their filled style immediately (25–60 ms in the sandbox browser; saving to the device took ~5 ms). The one reproduced defect was the age/height/weight wheels: while turning, the highlight stayed on the old number and slid away from the centre band until scrolling paused and the value was saved. Fix: the wheel now highlights the row under the centre band live while turning and still saves only when it settles (`onboarding-wheel.tsx`). Evidence: new `onboarding-selection.test.tsx` (failed before, passes after), 83/83 tests, typecheck clean; Playwright at 390x844 and 800x1280, EN/AR, Light/Dark. Unverified: real phones/tablets (touch fling), and whether the user's original "frozen" report came from the older app.
+
 Append future decisions here with date, decision, reason, affected requirements, and whether it replaces an earlier decision.
 
 ## 18. Open verification items (do not assume complete)
 
-- Confirm current onboarding selection visuals in the latest preview.
+- Confirm current onboarding selection visuals in the latest preview. — Browser preview checked 2026-11-13 (tap controls OK; wheel highlight lag fixed). Real-device check still open.
 - Confirm actual current logo artwork and extract its color values. — Done 2026-11-13 (sampled: deep #1e6337, mid #178258, lime #c3e828, white #eaf0ec).
 - Confirm standalone M mark exists and is used in the correct contexts. — Implemented / unverified in Arabic and tablet.
 - Confirm plant assets/references have been fully removed. — Done 2026-11-13 (code search clean).

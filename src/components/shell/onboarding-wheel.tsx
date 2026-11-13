@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 export interface WheelItem {
@@ -39,6 +39,11 @@ export function Wheel({
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastEmitted = useRef(value)
   const index = Math.max(0, items.findIndex((i) => i.value === value))
+  // Row currently under the centre band. Drives the highlight so it follows the finger while scrolling;
+  // the value itself is only committed (onChange) once scrolling settles.
+  const [liveIndex, setLiveIndex] = useState(index)
+  useEffect(() => setLiveIndex(index), [index])
+  const clampIndex = (top: number) => Math.min(Math.max(Math.round(top / ITEM_H), 0), items.length - 1)
 
   // Center the current value on mount and on external value changes.
   useEffect(() => {
@@ -53,11 +58,13 @@ export function Wheel({
   // Debounced settle: only commit the selection after scrolling pauses,
   // so a fast fling never fires intermediate values.
   const handleScroll = () => {
+    const now = ref.current
+    if (now) setLiveIndex(clampIndex(now.scrollTop))
     if (settleTimer.current) clearTimeout(settleTimer.current)
     settleTimer.current = setTimeout(() => {
       const el = ref.current
       if (!el) return
-      const i = Math.min(Math.max(Math.round(el.scrollTop / ITEM_H), 0), items.length - 1)
+      const i = clampIndex(el.scrollTop)
       const v = items[i]?.value
       if (v !== undefined && v !== lastEmitted.current) {
         lastEmitted.current = v
@@ -113,7 +120,7 @@ export function Wheel({
         style={{ height: viewportH, paddingTop: edgeH, paddingBottom: edgeH }}
       >
         {items.map((it, i) => {
-          const selected = i === index
+          const selected = i === liveIndex
           return (
             <div
               key={it.value}

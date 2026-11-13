@@ -116,8 +116,8 @@ Requirements:
 ## 6. Loading and motion
 
 ### M mark loading animation
-Agreed concept (not to be confused with the current ordinary full-logo loading state):
-- Use only the partial M mark, not the complete logo with “Loading your data”.
+Agreed concept:
+- Use only the partial M mark, not the complete square logo tile. (2026-11-13: the user asked for the localized “Loading your data…” message to be visible directly below the mark; this replaces the earlier screen-reader-only label.)
 - Outline/contour treatment with the interior unfilled.
 - One light/white half and one lemon/lime half remain magnetically connected near the top.
 - The halves rotate/swap sides in a continuous loop, conceptually completing a 360-degree turn without visibly disconnecting.
@@ -125,7 +125,15 @@ Agreed concept (not to be confused with the current ordinary full-logo loading s
 - Respect reduced-motion preferences and avoid unnecessary CPU/battery load.
 - Remove the old plant animation and all plant loading references.
 
-**Status (2026-11-13, Phase 1 Task 6): Implemented / verified in browser preview only.** `LoadingMark` (`src/components/common/loading-mark.tsx`) renders `BrandMark variant="outline" animated`: the two arches measured from the official 1024px artwork (traced outline matched the logo exactly when overlaid), contours only, lime arch masked where the white arch covers it, so the halves join at the top of the shared middle leg exactly as in the logo. Animation: one CSS transform (`m-turn`, 2.8 s, eased per half-turn) turns the whole plane 360° around the shared leg, so the halves swap sides and back without separating. Colours via `--mark-a`/`--mark-b`/`--mark-b-edge` tokens (Light: deep-green arch + lime arch with green casing; Dark: white + lime). Runs only under `motion-safe`; reduced motion shows the static outline. The visible "Loading your data…" text was removed; it remains as the screen-reader status label. The only true app-loading state today is the AppShell data-loading screen, now replaced; no other loading presentations exist (future Mizo loading should reuse `LoadingMark`).
+**Acceptance criteria (agreed 2026-11-13, replaces the earlier whole-plane turn):**
+- The two halves are separate visual elements that move independently and trade left/right places in a continuous loop, staying joined at their shared upper joint throughout. Never one rigid plane, never detached, no generic spinner or fade.
+- Outline/contour only, interior empty; official M geometry, never redrawn.
+- Reads clearly as the M at the rest positions; no half stays edge-on for more than a passing instant; calm, smooth, no jumps.
+- Reduced motion shows the static outlined M.
+- A visible, localized message directly below the mark (EN "Loading your data…", AR "تحميل بياناتك…"), one polite status region, no duplicate announcement; mark and message centred together with no overflow or scroll on phone/tablet/desktop.
+- Used for the real app data-loading state only, and reusable for future Mizo loading.
+
+**Status (2026-11-13, brand/logo correction): Implemented / verified in browser preview only.** `BrandMark variant="outline"` now renders the two arches as two separate elements (lime behind, white in front), each with the official 1024px-artwork geometry. Every rotation pivots on the shared joint (x 512.25 on the middle leg, y 327 where the two outer contours meet), so the halves stay joined. Per swap (2.4 s), the left half swings forward over the joint while the right half follows 0.4 s later, swinging back. While they pass, each leans up to 18° toward where it is heading, so they stay two distinct shapes. Then the swapped M rests for 0.7 s. Two swaps make one 4.8 s loop, with a full 360° per half. Each arch band is painted with `--mark-fill` (the surface colour, by default the page background), so the half behind is hidden as in the logo while the interior still reads as empty; on any other surface, override `--mark-fill`. Transform-only animation (compositor). `LoadingMark` shows the localized message visibly under the mark. During loading, the language comes from the saved preference that is already applied to the page, so Arabic users no longer see English. The earlier whole-plane `m-turn` animation was removed. Known limits: at the exact moment a half is edge-on it is a thin line (sometimes slightly broken) for a split second, and while the halves pass, they briefly overlap. Both follow from turning around a shared joint.
 
 ### Screen transitions
 - Card-to-card navigation should feel like the incoming card smoothly pushes the previous card sideways.
@@ -321,15 +329,17 @@ Record anything not tested explicitly as **unverified**.
 
 - **2026-11-13:** Phase 1 Task 6 (M loading animation) — Implemented / verified in browser preview only. See section 6 status. Files: `src/components/common/brand-mark.tsx` (outline variant), `src/components/common/loading-mark.tsx` (new), `src/components/shell/app-shell.tsx`, `src/styles.css` (`m-turn` keyframes, `--mark-*` tokens). Evidence: 87/87 tests (new `loading-mark.test.tsx`), typecheck clean, build OK; Playwright with the data store held in its loading state: 390x844 EN Light/Dark and AR Light, 800x1280 EN Light, 1280x800 AR Dark — animation `m-turn` running, mark centred, no image tile, no page scroll, no console errors; frames sampled across the turn in Light and Dark show the swap with the halves joined; reduced motion (390x844 EN Dark, 1280x800 AR Light) shows the static outline with no animation. Unverified: real Android/tablet (smoothness, battery), screen-reader announcement on device.
 
+- **2026-11-13:** Brand/logo correction (consolidated task) — Implemented / verified in browser preview only. Replaces the Task 6 whole-plane turn with the separate-halves animation described in section 6, and makes the loading message visible and localized. Files: `src/components/common/brand-mark.tsx`, `src/components/common/loading-mark.tsx`, `src/components/shell/app-shell.tsx`, `src/styles.css`, `src/lib/i18n/ar.ts` (AR text now “تحميل بياناتك…”), `src/test/mizano/loading-mark.test.tsx`. Brand audit: every in-app placement (onboarding header, Welcome, desktop onboarding side panel, onboarding intro, sidebar, Today header) uses the standalone M (`BrandMark` mark); the square tile is used only by favicon/PWA/Apple/Android icon files (`public/`) and is not rendered anywhere in the app UI (checked in the page at 390x844, 800x1280 and 1280x800, EN/AR, Light/Dark); no transform/mirroring in RTL. No plant/leaf branding remains in the source (search clean; the generic food icons are unrelated). Evidence: 89/89 tests; build OK; lint shows only the project-wide prettier quote/semicolon formatting errors, with no other rule problems in the changed files. Playwright with the data store held in loading: 390x844 EN/AR × Light/Dark, 360x640 AR Dark, 800x1280 EN Light and AR Dark, 1280x800 EN Dark and AR Light. In each: message visible and localized, directly below the mark, both centred, no scroll, no square tile, no console errors. Frames sampled across the loop at 390x844 AR Light/Dark, 800x1280 AR Dark and 1280x800 EN Dark/AR Light show the halves trading places while joined at the top. Reduced motion (390x844 EN Dark, 1280x800 AR Light): static M, no animation. Not checked: real Android phone/tablet (smoothness, battery, screen reader), and the onboarding intro help panel (not changed).
+
 Append future decisions here with date, decision, reason, affected requirements, and whether it replaces an earlier decision.
 
 ## 18. Open verification items (do not assume complete)
 
 - Confirm current onboarding selection visuals in the latest preview. — Browser preview checked 2026-11-13 (tap controls OK; wheel highlight lag fixed). Real-device check still open.
 - Confirm actual current logo artwork and extract its color values. — Done 2026-11-13 (sampled: deep #1e6337, mid #178258, lime #c3e828, white #eaf0ec).
-- Confirm standalone M mark exists and is used in the correct contexts. — Implemented / unverified in Arabic and tablet.
-- Confirm plant assets/references have been fully removed. — Done 2026-11-13 (code search clean).
-- Confirm loading animation matches the agreed partial-M concept (not just a static full logo). — Implemented 2026-11-13; browser preview checked (Light/Dark, EN/AR, phone/tablet/desktop, reduced motion). Real-device smoothness still open.
+- Confirm standalone M mark exists and is used in the correct contexts. — Verified in browser preview 2026-11-13 (EN/AR, Light/Dark, phone/tablet/desktop; not mirrored in RTL; square tile not rendered in the app UI). Real devices still open.
+- Confirm plant assets/references have been fully removed. — Done 2026-11-13 (code search clean; re-checked in the brand/logo correction).
+- Confirm loading animation matches the agreed partial-M concept (not just a static full logo). — Reworked 2026-11-13 to separate halves trading places around the shared joint, with a visible localized message; browser preview checked (Light/Dark, EN/AR, phone/tablet/desktop, reduced motion). The user's visual sign-off and real-device smoothness are still open.
 - Confirm Day Start persistence and late-night logging behavior. — Logic covered by tests; UI checked in browser preview 2026-11-13 (onboarding + Settings, EN/AR). Real-device late-night use still open.
 - Confirm Add Food and Idea Wheel modal positioning from all entry points and viewport sizes.
 - Confirm Today macro card contrast in both themes.

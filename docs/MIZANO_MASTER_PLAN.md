@@ -4,7 +4,7 @@
 > **Last consolidated:** 2026-11-13  
 > **Project:** Mizano nutrition and meal-tracking app  
 > **Working Lovable project:** Migration Studio — `9633ace4-f9a1-4c55-8aad-71ee8b9bd9a2`  
-> **Working source branch:** `main`  
+> **Working source branch:** `development/mizano-roadmap`  
 > **Rule:** This document records agreed scope and decisions. Do not silently reinterpret, omit, replace, or mark an item complete without evidence and user confirmation where needed.
 
 ---
@@ -41,7 +41,7 @@ Known baseline from the project audit (re-verify before architectural changes):
 Known project links:
 - Lovable editor: https://lovable.dev/projects/9633ace4-f9a1-4c55-8aad-71ee8b9bd9a2
 - Lovable preview: https://id-preview--9633ace4-f9a1-4c55-8aad-71ee8b9bd9a2.lovable.app
-- GitHub working branch: https://github.com/omgh32456u-wq/project-migration-studio/tree/main
+- GitHub working branch: https://github.com/omgh32456u-wq/project-migration-studio/tree/development/mizano-roadmap
 
 ## 3. Scope and status vocabulary
 
@@ -309,6 +309,7 @@ Record anything not tested explicitly as **unverified**.
 - **2026-11-12:** M loading animation concept saved: outline, two connected light/lemon halves, continuous side swap/rotation.
 - **2026-11-13:** The project is to follow a fixed, tracked roadmap; avoid forgotten requirements, contradictory changes, unnecessary idea expansion, and unplanned execution.
 - **2026-11-13:** One coherent logo-led visual identity is mandatory; Light/Dark must be intentionally designed; defer Liquid Glass until foundations are stable.
+- **2026-11-13:** Approved working branch is `development/mizano-roadmap`. Keep `main` stable; all implementation and plan updates for this work go to the development branch until the user reviews and explicitly approves a merge.
 
 Append future decisions here with date, decision, reason, affected requirements, and whether it replaces an earlier decision.
 

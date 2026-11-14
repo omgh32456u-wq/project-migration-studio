@@ -46,7 +46,7 @@ function NameForm({ prefill, onSkip, onSave }: { prefill: string; onSkip: () => 
         <DialogDescription>{t('account.namePrompt.hint')}</DialogDescription>
       </DialogHeader>
       <Field label={t('account.name')}>
-        {({ id }) => <TextInput id={id} value={name} onChange={(e) => setName(e.target.value)} maxLength={MAX_DISPLAY_NAME} autoComplete="given-name" autoFocus />}
+        {({ id }) => <TextInput id={id} value={name} onChange={(e) => setName(e.target.value)} maxLength={MAX_DISPLAY_NAME} autoComplete="given-name" placeholder={t('account.namePlaceholder')} autoFocus />}
       </Field>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onSkip}>

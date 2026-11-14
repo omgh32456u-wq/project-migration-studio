@@ -22,6 +22,7 @@ export type AuthErrorCode =
   | 'invalid_email'
   | 'missing_password'
   | 'weak_password'
+  | 'password_mismatch'
   | 'invalid_credentials'
   | 'email_taken'
   | 'network'
@@ -58,11 +59,55 @@ export const unconfiguredAuthClient: AuthClient = {
 export const MIN_PASSWORD_LENGTH = 8
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
-/** Client-side checks before any request. Sign-in does not enforce the length rule (old passwords). */
-export function validateEmailCredentials(mode: AuthMode, email: string, password: string): AuthErrorCode | null {
-  if (!EMAIL_RE.test(email.trim())) return 'invalid_email'
+export function isValidEmail(email: string): boolean {
+  return EMAIL_RE.test(email.trim())
+}
+
+/** New-account password rules, in the order they are shown. Sign-in never applies them. */
+export const PASSWORD_RULES = ['length', 'upper', 'lower', 'number', 'special'] as const
+export type PasswordRule = (typeof PASSWORD_RULES)[number]
+
+/** Which rules a password meets. Unicode-aware, so Arabic-Indic digits count as numbers. */
+export function passwordChecks(password: string): Record<PasswordRule, boolean> {
+  return {
+    length: [...password].length >= MIN_PASSWORD_LENGTH,
+    upper: /\p{Lu}/u.test(password),
+    lower: /\p{Ll}/u.test(password),
+    number: /\p{Nd}/u.test(password),
+    special: /[^\p{L}\p{N}\s]/u.test(password),
+  }
+}
+
+export function meetsPasswordRules(password: string): boolean {
+  return Object.values(passwordChecks(password)).every(Boolean)
+}
+
+export type PasswordStrength = 'none' | 'weak' | 'medium' | 'strong'
+
+/** Strength from the rules met: strong needs all five; 3–4 is medium; 1–2 is weak. */
+export function passwordStrength(password: string): PasswordStrength {
+  if (password === '') return 'none'
+  const met = Object.values(passwordChecks(password)).filter(Boolean).length
+  if (met === PASSWORD_RULES.length) return 'strong'
+  return met >= 3 ? 'medium' : 'weak'
+}
+
+/** Sign-up submit is allowed only when every check passes and no request is running. */
+export function canSubmitSignUp(email: string, password: string, confirm: string, busy = false): boolean {
+  return !busy && isValidEmail(email) && meetsPasswordRules(password) && confirm !== '' && confirm === password
+}
+
+/**
+ * Client-side checks before any request. Sign-in only needs a valid email and a non-empty password,
+ * so passwords created before the sign-up rules still work. Sign-up needs every rule and a match.
+ */
+export function validateEmailCredentials(mode: AuthMode, email: string, password: string, confirm?: string): AuthErrorCode | null {
+  if (!isValidEmail(email)) return 'invalid_email'
   if (password === '') return 'missing_password'
-  if (mode === 'sign_up' && password.length < MIN_PASSWORD_LENGTH) return 'weak_password'
+  if (mode === 'sign_up') {
+    if (!meetsPasswordRules(password)) return 'weak_password'
+    if (confirm !== password) return 'password_mismatch'
+  }
   return null
 }
 

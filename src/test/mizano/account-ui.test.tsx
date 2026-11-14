@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTranslator } from '@/lib/i18n'
 import { defaultSettings } from '@/lib/defaults'
-import type { AccountState, AuthClient, AuthMode } from '@/lib/account'
+import type { AccountState, AuthClient, AuthMode, SignUpResult } from '@/lib/account'
 import type { Settings } from '@/lib/types'
 
 // Minimal store: real English strings, in-memory settings (no IndexedDB in jsdom).
@@ -34,9 +34,23 @@ function Panel({ initial }: { initial: AuthMode }) {
   return <AuthPanel mode={mode} onModeChange={setMode} onGuest={() => {}} renderHeader={(title) => <h1>{title}</h1>} />
 }
 
-function fillEmail(email: string, password: string) {
+function fillEmail(email: string, password: string, confirm?: string) {
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: email } })
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: password } })
+  if (confirm !== undefined) fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: confirm } })
+}
+
+const STRONG = 'Mizano#2026'
+const rule = (name: string) => document.querySelector(`[data-rule="${name}"]`) as HTMLElement
+
+function openSignUpEmail(client = fakeClient()) {
+  render(
+    <AccountProvider client={client}>
+      <Panel initial="sign_up" />
+    </AccountProvider>,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Sign up with email' }))
+  return client
 }
 
 beforeEach(() => {
@@ -80,7 +94,7 @@ describe('auth entry', () => {
       </AccountProvider>,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Sign up with email' }))
-    fillEmail('me@site.co', 'longpassword')
+    fillEmail('me@site.co', STRONG, STRONG)
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     expect(await screen.findByRole('heading', { name: 'Check your email' })).toBeInTheDocument()
     expect(client.signUpWithEmail).toHaveBeenCalledTimes(1)
@@ -107,12 +121,144 @@ describe('auth entry', () => {
       </AccountProvider>,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Sign up with email' }))
-    fillEmail('o@m.co', 'longpassword')
+    fillEmail('o@m.co', STRONG, STRONG)
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     expect(await screen.findByRole('heading', { name: 'What should we call you?' })).toBeInTheDocument()
     expect(screen.getByLabelText('Display name')).toHaveValue('Omar')
+    expect(screen.getByLabelText('Display name')).toHaveAttribute('placeholder', 'Your name')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(store.settings.account).toEqual({ userId: 'u9', displayName: 'Omar', avatar: null }))
+  })
+})
+
+describe('sign-up password form', () => {
+  it('shows the Apple logo on the still-disabled Apple button', () => {
+    render(
+      <AccountProvider client={fakeClient()}>
+        <Panel initial="sign_up" />
+      </AccountProvider>,
+    )
+    const apple = screen.getByRole('button', { name: /^Sign up with Apple/ })
+    expect(apple).toBeDisabled()
+    expect(apple).toHaveTextContent('Coming later')
+    expect(apple.querySelector('svg path')).not.toBeNull()
+  })
+
+  it('shows the email and password placeholders', () => {
+    openSignUpEmail()
+    expect(screen.getByLabelText('Email')).toHaveAttribute('placeholder', 'example@gmail.com')
+    expect(screen.getByLabelText('Email')).toHaveAttribute('type', 'email')
+    expect(screen.getByLabelText('Password')).toHaveAttribute('placeholder', 'Enter your password')
+    expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'new-password')
+    expect(screen.getByLabelText('Confirm password')).toHaveAttribute('autocomplete', 'new-password')
+  })
+
+  it.each([
+    ['length', 'Aa1!aaaa', 'Aa1!aaa'],
+    ['upper', 'aaaa1!aA', 'aaaa1!aa'],
+    ['lower', 'AAAA1!Aa', 'AAAA1!AA'],
+    ['number', 'Aaaaa!a1', 'Aaaaa!aa'],
+    ['special', 'Aaaaa1a!', 'Aaaaa1aa'],
+  ])('updates the %s requirement live while typing', (name, passing, failing) => {
+    openSignUpEmail()
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: failing } })
+    expect(rule(name).dataset.met).toBe('false')
+    expect(rule(name)).toHaveTextContent(/^Not yet:/)
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: passing } })
+    expect(rule(name).dataset.met).toBe('true')
+    expect(rule(name)).toHaveTextContent(/^Done:/)
+  })
+
+  it('rates strength weak, medium, then strong as rules are met', () => {
+    openSignUpEmail()
+    const password = screen.getByLabelText('Password')
+    fireEvent.change(password, { target: { value: 'abc' } })
+    expect(screen.getByText('Password strength: Weak')).toBeInTheDocument()
+    fireEvent.change(password, { target: { value: 'abcdefgH' } })
+    expect(screen.getByText('Password strength: Medium')).toBeInTheDocument()
+    fireEvent.change(password, { target: { value: STRONG } })
+    expect(screen.getByText('Password strength: Strong')).toBeInTheDocument()
+  })
+
+  it('shows live confirmation matching, with its own show/hide control', () => {
+    openSignUpEmail()
+    fillEmail('me@site.co', STRONG, 'Mizano#20')
+    expect(screen.getByText("Passwords don't match")).toBeInTheDocument()
+    expect(screen.getByLabelText('Confirm password')).toHaveAttribute('aria-invalid', 'true')
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: STRONG } })
+    expect(screen.getByText('Passwords match')).toBeInTheDocument()
+    expect(screen.getByLabelText('Confirm password')).toHaveAttribute('type', 'password')
+    fireEvent.click(screen.getByRole('button', { name: 'Show password confirmation' }))
+    expect(screen.getByLabelText('Confirm password')).toHaveAttribute('type', 'text')
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
+  })
+
+  it('keeps Create account disabled until email, every rule and a matching confirmation pass', async () => {
+    const client = openSignUpEmail()
+    const submit = () => screen.getByRole('button', { name: 'Create account' }) as HTMLButtonElement
+    expect(submit().disabled).toBe(true)
+    fillEmail('not-an-email', STRONG, STRONG)
+    expect(submit().disabled).toBe(true)
+    fillEmail('me@site.co', 'mizano#2026', 'mizano#2026')
+    expect(submit().disabled).toBe(true)
+    fillEmail('me@site.co', STRONG, '')
+    expect(submit().disabled).toBe(true)
+    fillEmail('me@site.co', STRONG, STRONG + 'x')
+    expect(submit().disabled).toBe(true)
+    fireEvent.click(submit())
+    expect(client.signUpWithEmail).not.toHaveBeenCalled()
+    fillEmail('me@site.co', STRONG, STRONG)
+    expect(submit().disabled).toBe(false)
+    fireEvent.click(submit())
+    expect(await screen.findByRole('heading', { name: 'Check your email' })).toBeInTheDocument()
+    expect(client.signUpWithEmail).toHaveBeenCalledWith('me@site.co', STRONG)
+  })
+
+  it('disables Create account while the request is running', async () => {
+    let release: () => void = () => {}
+    const client = fakeClient({
+      signUpWithEmail: vi.fn(() => new Promise<SignUpResult>((r) => (release = () => r({ ok: true as const, needsConfirmation: true as const })))),
+    })
+    openSignUpEmail(client)
+    fillEmail('me@site.co', STRONG, STRONG)
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByRole('button', { name: 'Please wait…' })).toBeDisabled()
+    release()
+    expect(await screen.findByRole('heading', { name: 'Check your email' })).toBeInTheDocument()
+  })
+})
+
+describe('sign-in compatibility', () => {
+  const openSignIn = (client = fakeClient()) => {
+    render(
+      <AccountProvider client={client}>
+        <Panel initial="sign_in" />
+      </AccountProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with email' }))
+    return client
+  }
+
+  it('has no confirm field or requirements and accepts an old simple password', async () => {
+    const client = openSignIn()
+    expect(screen.queryByLabelText('Confirm password')).toBeNull()
+    expect(document.querySelector('[data-rule]')).toBeNull()
+    expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password')
+    fillEmail('old@user.co', 'abc')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(client.signInWithEmail).toHaveBeenCalledWith('old@user.co', 'abc'))
+    expect(client.signUpWithEmail).not.toHaveBeenCalled()
+  })
+
+  it('only asks for a valid email and a non-empty password', async () => {
+    const client = openSignIn()
+    fillEmail('old@user.co', '')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByText('Enter your password.')).toBeInTheDocument()
+    fillEmail('nope', 'abc')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument()
+    expect(client.signInWithEmail).not.toHaveBeenCalled()
   })
 })
 

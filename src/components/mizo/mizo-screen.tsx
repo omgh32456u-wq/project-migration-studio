@@ -6,6 +6,7 @@ import { Card, PageHeader } from '@/components/common/controls'
 import { useStore } from '@/components/providers/app-store'
 import { mizoAccess } from '@/lib/account'
 import type { ChatStore } from '@/lib/mizo/chat-store'
+import type { MizoTransport } from '@/lib/mizo/client'
 import { MizoGlyph, MizoWorkspace } from './mizo-workspace'
 
 /**
@@ -13,7 +14,7 @@ import { MizoGlyph, MizoWorkspace } from './mizo-workspace'
  * history are never mounted for them. Signed-in users of any supported age (15–17 included) get the
  * workspace, keyed by account id so switching accounts remounts it with that account's history only.
  */
-export function MizoScreen({ chatStore }: { chatStore?: ChatStore }) {
+export function MizoScreen({ chatStore, transport }: { chatStore?: ChatStore; transport?: MizoTransport }) {
   const { t } = useStore().i18n
   const account = useAccount()
   const access = mizoAccess(account.account)
@@ -22,7 +23,7 @@ export function MizoScreen({ chatStore }: { chatStore?: ChatStore }) {
     return (
       <div className="flex flex-col" data-mizo={access}>
         <PageHeader title={t('mizo.title')} actions={<AvatarButton className="lg:hidden" />} />
-        <MizoWorkspace key={account.account.user.id} userId={account.account.user.id} store={chatStore} />
+        <MizoWorkspace key={account.account.user.id} userId={account.account.user.id} store={chatStore} transport={transport} />
       </div>
     )
   }

@@ -14,13 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      mizo_requests: {
+        Row: {
+          created_at: string
+          finished_at: string | null
+          id: string
+          output_chars: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          output_chars?: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          output_chars?: number
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      mizo_begin_request: {
+        Args: {
+          _burst_limit: number
+          _concurrent_limit: number
+          _daily_limit: number
+          _stale_seconds?: number
+          _user_id: string
+        }
+        Returns: {
+          daily_limit: number
+          outcome: string
+          request_id: string
+          resets_at: string
+          used_today: number
+        }[]
+      }
+      mizo_finish_request: {
+        Args: {
+          _output_chars: number
+          _request_id: string
+          _status: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

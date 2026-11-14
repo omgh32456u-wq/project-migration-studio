@@ -8,6 +8,19 @@ export interface MizoMessage {
   role: 'user' | 'assistant'
   text: string
   createdAt: string
+  /** Assistant replies only: `stopped` = Stop pressed, `cut` = connection or service broke off mid-reply. */
+  status?: 'complete' | 'stopped' | 'cut'
+  /** Assistant replies only: the question this answers, so a retry never saves a second copy. */
+  replyTo?: string
+}
+
+/** Per-account, on-device record of the Mizo sharing consent. Deleting the chat does not change it. */
+export interface MizoConsent {
+  userId: string
+  /** The consent wording version agreed to (see `MIZO_CONSENT_VERSION`). */
+  version: number
+  granted: boolean
+  updatedAt: string
 }
 
 export interface MizoConversation {
@@ -21,11 +34,15 @@ export interface ChatStore {
   load(userId: string): Promise<MizoConversation>
   save(conversation: MizoConversation): Promise<void>
   remove(userId: string): Promise<void>
+  loadConsent(userId: string): Promise<MizoConsent | null>
+  saveConsent(consent: MizoConsent): Promise<void>
 }
 
 export const CHAT_DB_NAME = 'mizano-mizo'
-const CHAT_DB_VERSION = 1
+/** v2 adds the `consent` store; v1 conversations are kept as they are. */
+const CHAT_DB_VERSION = 2
 const STORE = 'conversations'
+const CONSENT = 'consent'
 
 export function emptyConversation(userId: string): MizoConversation {
   return { userId, messages: [], updatedAt: new Date(0).toISOString() }
@@ -37,6 +54,16 @@ function assertUser(userId: string) {
 
 export class MemoryChatStore implements ChatStore {
   private map = new Map<string, MizoConversation>()
+  private consent = new Map<string, MizoConsent>()
+  async loadConsent(userId: string) {
+    assertUser(userId)
+    const c = this.consent.get(userId)
+    return c ? { ...c } : null
+  }
+  async saveConsent(c: MizoConsent) {
+    assertUser(c.userId)
+    this.consent.set(c.userId, { ...c })
+  }
   async load(userId: string) {
     assertUser(userId)
     const c = this.map.get(userId)
@@ -62,9 +89,9 @@ class IdbChatStore implements ChatStore {
   constructor(private db: IDBDatabase) {
     db.onversionchange = () => db.close()
   }
-  private async run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-    const tx = this.db.transaction(STORE, mode)
-    const result = await req(fn(tx.objectStore(STORE)))
+  private async run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>, store = STORE): Promise<T> {
+    const tx = this.db.transaction(store, mode)
+    const result = await req(fn(tx.objectStore(store)))
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
@@ -84,6 +111,15 @@ class IdbChatStore implements ChatStore {
   async remove(userId: string) {
     await this.run('readwrite', (s) => s.delete(userId))
   }
+  async loadConsent(userId: string) {
+    assertUser(userId)
+    const c = (await this.run('readonly', (s) => s.get(userId), CONSENT)) as MizoConsent | undefined
+    return c && c.userId === userId ? c : null
+  }
+  async saveConsent(c: MizoConsent) {
+    assertUser(c.userId)
+    await this.run('readwrite', (s) => s.put(c), CONSENT)
+  }
 }
 
 export async function openChatStore(factory: IDBFactory | undefined = typeof indexedDB === 'undefined' ? undefined : indexedDB): Promise<ChatStore> {
@@ -93,6 +129,7 @@ export async function openChatStore(factory: IDBFactory | undefined = typeof ind
       const r = factory.open(CHAT_DB_NAME, CHAT_DB_VERSION)
       r.onupgradeneeded = () => {
         if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE, { keyPath: 'userId' })
+        if (!r.result.objectStoreNames.contains(CONSENT)) r.result.createObjectStore(CONSENT, { keyPath: 'userId' })
       }
       r.onsuccess = () => resolve(r.result)
       r.onerror = () => reject(r.error)

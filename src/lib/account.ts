@@ -72,6 +72,8 @@ export interface AuthClient {
   /** The button (Sign in / Sign up) pressed before the last Google redirect on this tab, if known. Wording only. */
   googleIntent?(): AuthMode | null
   clearGoogleIntent?(): void
+  /** A current (refreshed if needed) access token for the signed-in account, for the app's own endpoints. */
+  accessToken?(): Promise<string | null>
 }
 
 export type AuthChange =

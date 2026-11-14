@@ -10,6 +10,7 @@ import { useAction } from '@/components/providers/use-action'
 import { MEAL_SLOTS, type MealSlot, type Profile } from '@/lib/types'
 import { DataCard } from './data-card'
 import { DayStartField } from './day-start-field'
+import { MizoPrivacyCard } from './mizo-privacy-card'
 import { ProfileForm } from './profile-form'
 import { RemindersCard } from './reminders-card'
 
@@ -34,6 +35,7 @@ export function SettingsScreen() {
         </div>
         <div className="flex flex-col gap-5">
           <TargetsCard />
+          <MizoPrivacyCard />
           <DataCard />
           <SettingsSection id="about" title={t('about.title')}>
             <p className="text-sm leading-relaxed text-muted-foreground">{t('about.body')}</p>

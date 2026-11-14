@@ -25,7 +25,7 @@ interface AuthErrorLike {
   message?: string
 }
 
-type SessionLike = { user: SupabaseUserLike } | null
+type SessionLike = { user: SupabaseUserLike; access_token?: string } | null
 
 /** The subset of `supabase.auth` used, so tests can pass a fake. */
 export interface SupabaseAuthLike {
@@ -262,6 +262,15 @@ export function createSupabaseAuthClient(opts: SupabaseAuthOptions = {}): AuthCl
         await (await load()).auth.signOut({ scope: 'local' })
       } catch {
         /* the local session is cleared either way */
+      }
+    },
+
+    accessToken: async () => {
+      try {
+        const { data } = await (await load()).auth.getSession()
+        return data.session?.access_token ?? null
+      } catch {
+        return null
       }
     },
 

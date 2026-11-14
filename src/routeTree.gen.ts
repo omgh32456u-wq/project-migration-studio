@@ -14,6 +14,7 @@ import { Route as FoodsRouteImport } from './routes/foods'
 import { Route as MizoRouteImport } from './routes/mizo'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ApiPublicMizoChatRouteImport } from './routes/api/public/mizo/chat'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +41,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicMizoChatRoute = ApiPublicMizoChatRouteImport.update({
+  id: '/api/public/mizo/chat',
+  path: '/api/public/mizo/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/mizo': typeof MizoRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
+  '/api/public/mizo/chat': typeof ApiPublicMizoChatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/mizo': typeof MizoRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
+  '/api/public/mizo/chat': typeof ApiPublicMizoChatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,33 @@ export interface FileRoutesById {
   '/mizo': typeof MizoRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
+  '/api/public/mizo/chat': typeof ApiPublicMizoChatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/foods' | '/mizo' | '/progress' | '/settings'
+  fullPaths:
+    | '/'
+    | '/foods'
+    | '/mizo'
+    | '/progress'
+    | '/settings'
+    | '/api/public/mizo/chat'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/foods' | '/mizo' | '/progress' | '/settings'
-  id: '__root__' | '/' | '/foods' | '/mizo' | '/progress' | '/settings'
+  to:
+    | '/'
+    | '/foods'
+    | '/mizo'
+    | '/progress'
+    | '/settings'
+    | '/api/public/mizo/chat'
+  id:
+    | '__root__'
+    | '/'
+    | '/foods'
+    | '/mizo'
+    | '/progress'
+    | '/settings'
+    | '/api/public/mizo/chat'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +105,7 @@ export interface RootRouteChildren {
   MizoRoute: typeof MizoRoute
   ProgressRoute: typeof ProgressRoute
   SettingsRoute: typeof SettingsRoute
+  ApiPublicMizoChatRoute: typeof ApiPublicMizoChatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -116,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/mizo/chat': {
+      id: '/api/public/mizo/chat'
+      path: '/api/public/mizo/chat'
+      fullPath: '/api/public/mizo/chat'
+      preLoaderRoute: typeof ApiPublicMizoChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -125,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   MizoRoute: MizoRoute,
   ProgressRoute: ProgressRoute,
   SettingsRoute: SettingsRoute,
+  ApiPublicMizoChatRoute: ApiPublicMizoChatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

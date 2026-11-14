@@ -14,6 +14,7 @@ export interface SupabaseUserLike {
   created_at?: string
   last_sign_in_at?: string | null
   identities?: unknown[] | null
+  app_metadata?: Record<string, unknown> | null
   user_metadata?: Record<string, unknown> | null
 }
 
@@ -28,7 +29,7 @@ type SessionLike = { user: SupabaseUserLike } | null
 
 /** The subset of `supabase.auth` used, so tests can pass a fake. */
 export interface SupabaseAuthLike {
-  signUp(args: { email: string; password: string; options?: { emailRedirectTo?: string } }): Promise<{
+  signUp(args: { email: string; password: string; options?: { emailRedirectTo?: string; data?: Record<string, unknown> } }): Promise<{
     data: { user: SupabaseUserLike | null; session: SessionLike }
     error: AuthErrorLike | null
   }>
@@ -81,19 +82,55 @@ export function mapAuthError(error: AuthErrorLike | null | undefined): AuthError
   return 'unknown'
 }
 
-const TEN_MINUTES = 10 * 60 * 1000
+/** Durable marker written only when Mizano registration is finished. */
+export const REGISTERED_KEY = 'mizano_registered'
+const INTENT_KEY = 'tmm:google-intent'
+
+function providersOf(u: SupabaseUserLike): string[] {
+  const listed = u.app_metadata?.['providers']
+  if (Array.isArray(listed)) return listed.filter((p): p is string => typeof p === 'string')
+  const one = u.app_metadata?.['provider']
+  if (typeof one === 'string') return [one]
+  return (u.identities ?? []).map((i) => (i as { provider?: unknown }).provider).filter((p): p is string => typeof p === 'string')
+}
+
+/**
+ * Whether the account has finished Mizano registration. Accounts with an email/password identity came
+ * through the explicit sign-up form, so only Google-only accounts are gated. Legacy accounts made before
+ * the marker count as registered only when they carry metadata this app itself wrote (name answered,
+ * skipped, or a chosen display name); Google's own `full_name`/`name` never counts.
+ */
+export function isRegistered(u: SupabaseUserLike): boolean {
+  const meta = u.user_metadata ?? {}
+  if (meta[REGISTERED_KEY] === true) return true
+  if (meta['name_prompt_done'] === true) return true
+  if (typeof meta['display_name'] === 'string' && meta['display_name'].trim()) return true
+  const providers = providersOf(u)
+  return !(providers.includes('google') && !providers.includes('email'))
+}
 
 export function toAccountUser(u: SupabaseUserLike): AccountUser {
   const meta = u.user_metadata ?? {}
   const name = typeof meta['full_name'] === 'string' ? meta['full_name'] : typeof meta['name'] === 'string' ? meta['name'] : null
   const display = typeof meta['display_name'] === 'string' && meta['display_name'].trim() ? meta['display_name'].trim() : null
-  return { id: u.id, email: u.email ?? null, providerName: name, displayName: display, namePromptDone: meta['name_prompt_done'] === true }
+  const done = meta['name_prompt_done'] === true
+  return {
+    id: u.id,
+    email: u.email ?? null,
+    providerName: name,
+    displayName: display,
+    namePromptDone: done,
+    namePromptPending: meta['name_prompt_pending'] === true && !done,
+    needsRegistration: !isRegistered(u),
+  }
 }
 
-/** A first sign-in shortly after the account was created (registration, or confirming the email). */
-export function isFreshAccount(u: SupabaseUserLike): boolean {
-  if (!u.created_at || !u.last_sign_in_at) return false
-  return Date.parse(u.last_sign_in_at) - Date.parse(u.created_at) < TEN_MINUTES
+function session(): Storage | null {
+  try {
+    return typeof window === 'undefined' ? null : window.sessionStorage
+  } catch {
+    return null
+  }
 }
 
 function origin(): string | undefined {
@@ -144,7 +181,7 @@ export function createSupabaseAuthClient(opts: SupabaseAuthOptions = {}): AuthCl
     signUpWithEmail: (email, password) =>
       guard<SignUpResult>(
         async (auth) => {
-          const { data, error } = await auth.signUp({ email, password, options: { emailRedirectTo: origin() } })
+          const { data, error } = await auth.signUp({ email, password, options: { emailRedirectTo: origin(), data: { [REGISTERED_KEY]: true, name_prompt_pending: true } } })
           if (error) return { ok: false, error: mapAuthError(error) }
           // With email confirmation on, an address that already has an account comes back with no identities.
           if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return { ok: false, error: 'email_taken' }
@@ -165,12 +202,35 @@ export function createSupabaseAuthClient(opts: SupabaseAuthOptions = {}): AuthCl
         (error) => ({ ok: false, error }),
       ),
 
-    // Google creates an account on first use whichever button was pressed; `mode` only sets the wording.
-    signInWithGoogle: (_mode: AuthMode) =>
+    // Supabase creates the Auth user on first Google use whichever button was pressed. The intent is kept
+    // for wording only; access depends on the registration marker read back from the account.
+    signInWithGoogle: (mode: AuthMode) =>
       guard<{ ok: true } | { ok: false; error: AuthErrorCode }>(
         async (auth) => {
           if ((await googleEnabled()) === false) return { ok: false, error: 'provider_disabled' }
+          session()?.setItem(INTENT_KEY, mode)
           const { error } = await auth.signInWithOAuth({ provider: 'google', options: { redirectTo: origin() } })
+          if (error) session()?.removeItem(INTENT_KEY)
+          return error ? { ok: false, error: mapAuthError(error) } : { ok: true }
+        },
+        (error) => {
+          session()?.removeItem(INTENT_KEY)
+          return { ok: false, error }
+        },
+      ),
+
+    googleIntent: () => {
+      const v = session()?.getItem(INTENT_KEY)
+      return v === 'sign_in' || v === 'sign_up' ? v : null
+    },
+    clearGoogleIntent: () => session()?.removeItem(INTENT_KEY),
+
+    completeRegistration: (displayName) =>
+      guard<{ ok: true } | { ok: false; error: AuthErrorCode }>(
+        async (auth) => {
+          const meta: Record<string, unknown> = { [REGISTERED_KEY]: true, name_prompt_done: true, name_prompt_pending: false }
+          if (displayName) meta['display_name'] = displayName
+          const { error } = await auth.updateUser({ data: meta })
           return error ? { ok: false, error: mapAuthError(error) } : { ok: true }
         },
         (error) => ({ ok: false, error }),
@@ -188,7 +248,7 @@ export function createSupabaseAuthClient(opts: SupabaseAuthOptions = {}): AuthCl
     updateProfile: (data) =>
       guard<{ ok: true } | { ok: false; error: AuthErrorCode }>(
         async (auth) => {
-          const meta: Record<string, unknown> = { name_prompt_done: true }
+          const meta: Record<string, unknown> = { name_prompt_done: true, name_prompt_pending: false }
           if (data.displayName !== undefined) meta['display_name'] = data.displayName
           const { error } = await auth.updateUser({ data: meta })
           return error ? { ok: false, error: mapAuthError(error) } : { ok: true }
@@ -220,10 +280,10 @@ export function createSupabaseAuthClient(opts: SupabaseAuthOptions = {}): AuthCl
       void load()
         .then((client) => {
           if (cancelled) return
-          const { data } = client.auth.onAuthStateChange((event, session) => {
+          const { data } = client.auth.onAuthStateChange((event, sess) => {
             // Only identity changes; token refreshes and the initial event are ignored.
-            if (event === 'SIGNED_IN' && session) listener({ type: 'signed_in', user: toAccountUser(session.user), fresh: isFreshAccount(session.user) })
-            else if (event === 'USER_UPDATED' && session) listener({ type: 'updated', user: toAccountUser(session.user) })
+            if (event === 'SIGNED_IN' && sess) listener({ type: 'signed_in', user: toAccountUser(sess.user) })
+            else if (event === 'USER_UPDATED' && sess) listener({ type: 'updated', user: toAccountUser(sess.user) })
             else if (event === 'SIGNED_OUT') listener({ type: 'signed_out' })
           })
           stop = () => data.subscription.unsubscribe()

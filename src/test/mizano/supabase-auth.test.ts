@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSupabaseAuthClient, isFreshAccount, mapAuthError, takeAuthRedirectError, type SupabaseAuthLike } from '@/lib/supabase-auth'
+import { createSupabaseAuthClient, isRegistered, toAccountUser, mapAuthError, takeAuthRedirectError, type SupabaseAuthLike } from '@/lib/supabase-auth'
 
 const user = { id: 'u1', email: 'me@x.co', identities: [{}], user_metadata: { full_name: 'Omar M' } }
 
@@ -96,10 +96,6 @@ describe('Supabase session', () => {
     cb('SIGNED_OUT', null)
     expect(seen).toEqual(['signed_in', 'signed_out'])
   })
-  it('treats a first sign-in within ten minutes of creation as a new account', () => {
-    expect(isFreshAccount({ id: 'a', created_at: '2026-01-01T10:00:00Z', last_sign_in_at: '2026-01-01T10:03:00Z' })).toBe(true)
-    expect(isFreshAccount({ id: 'a', created_at: '2026-01-01T10:00:00Z', last_sign_in_at: '2026-01-05T10:00:00Z' })).toBe(false)
-  })
 })
 
 describe('redirect errors', () => {
@@ -120,6 +116,50 @@ describe('profile metadata', () => {
     const updateUser = vi.fn(async () => ({ error: null }))
     const client = createSupabaseAuthClient({ load: async () => ({ auth: { updateUser } as unknown as SupabaseAuthLike }) })
     expect(await client.updateProfile!({ displayName: 'Omar' })).toEqual({ ok: true })
-    expect(updateUser).toHaveBeenCalledWith({ data: { name_prompt_done: true, display_name: 'Omar' } })
+    expect(updateUser).toHaveBeenCalledWith({ data: { name_prompt_done: true, name_prompt_pending: false, display_name: 'Omar' } })
+  })
+})
+
+describe('registration marker', () => {
+  const g = (meta: Record<string, unknown> = {}, providers = ['google']) => ({ id: 'g', app_metadata: { providers }, user_metadata: { full_name: 'Sara Ali', ...meta } })
+  it('a brand-new Google-only user is not registered, whatever the timestamps', () => {
+    expect(isRegistered({ ...g(), created_at: '2026-01-01T10:00:00Z', last_sign_in_at: '2026-01-01T10:00:01Z' })).toBe(false)
+    expect(isRegistered({ ...g(), created_at: '2026-01-01T10:00:00Z', last_sign_in_at: '2026-03-01T10:00:00Z' })).toBe(false)
+    expect(toAccountUser(g()).needsRegistration).toBe(true)
+  })
+  it('the marker, or legacy metadata this app wrote, counts as registered; Google names alone do not', () => {
+    expect(isRegistered(g({ mizano_registered: true }))).toBe(true)
+    expect(isRegistered(g({ name_prompt_done: true }))).toBe(true)
+    expect(isRegistered(g({ display_name: 'Sara' }))).toBe(true)
+    expect(isRegistered(g({ display_name: '  ', name: 'Sara' }))).toBe(false)
+  })
+  it('email accounts (including email linked with Google) are never gated', () => {
+    expect(isRegistered(g({}, ['email']))).toBe(true)
+    expect(isRegistered(g({}, ['email', 'google']))).toBe(true)
+    expect(isRegistered({ id: 'x', identities: [{ provider: 'google' }] })).toBe(false)
+  })
+  it('email sign-up writes the marker and the pending name prompt flag', async () => {
+    const auth = fakeAuth()
+    await clientFor(auth).signUpWithEmail('me@x.co', 'Mizano#2026')
+    expect(auth.signUp).toHaveBeenCalledWith(expect.objectContaining({ options: expect.objectContaining({ data: { mizano_registered: true, name_prompt_pending: true } }) }))
+    expect(toAccountUser({ id: 'e', user_metadata: { name_prompt_pending: true } }).namePromptPending).toBe(true)
+  })
+  it('completeRegistration writes the marker, and reports a failed write', async () => {
+    const auth = fakeAuth()
+    expect(await clientFor(auth).completeRegistration!('Sara')).toEqual({ ok: true })
+    expect(auth.updateUser).toHaveBeenCalledWith({ data: { mizano_registered: true, name_prompt_done: true, name_prompt_pending: false, display_name: 'Sara' } })
+    const failing = fakeAuth({ updateUser: vi.fn(async () => ({ error: { name: 'AuthRetryableFetchError', status: 0 } })) })
+    expect(await clientFor(failing).completeRegistration!('')).toEqual({ ok: false, error: 'network' })
+  })
+  it('remembers the pressed button across the redirect, and forgets it when the redirect fails', async () => {
+    sessionStorage.clear()
+    const c = clientFor(fakeAuth())
+    await c.signInWithGoogle('sign_in')
+    expect(c.googleIntent!()).toBe('sign_in')
+    c.clearGoogleIntent!()
+    expect(c.googleIntent!()).toBeNull()
+    const bad = clientFor(fakeAuth({ signInWithOAuth: vi.fn(async () => ({ error: { code: 'x', status: 500 } })) }))
+    await bad.signInWithGoogle('sign_up')
+    expect(bad.googleIntent!()).toBeNull()
   })
 })

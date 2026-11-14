@@ -15,6 +15,10 @@ export interface AccountUser {
   displayName?: string | null
   /** The name prompt was answered or skipped once; it is never asked again for this account. */
   namePromptDone?: boolean
+  /** Email sign-up asked for the optional name prompt; cleared once it is answered or skipped. */
+  namePromptPending?: boolean
+  /** A Google-only account that has not finished Mizano registration. It never enters the app until it does. */
+  needsRegistration?: boolean
 }
 
 export type AccountState = { status: 'guest' } | { status: 'signed_in'; user: AccountUser }
@@ -63,10 +67,15 @@ export interface AuthClient {
   subscribe?(listener: (change: AuthChange) => void): () => void
   /** Saves profile fields to the signed-in account's metadata. */
   updateProfile?(data: { displayName?: string; namePromptDone?: boolean }): Promise<{ ok: true } | { ok: false; error: AuthErrorCode }>
+  /** Writes the durable registration-complete marker (and the optional name) to the account. */
+  completeRegistration?(displayName: string): Promise<{ ok: true } | { ok: false; error: AuthErrorCode }>
+  /** The button (Sign in / Sign up) pressed before the last Google redirect on this tab, if known. Wording only. */
+  googleIntent?(): AuthMode | null
+  clearGoogleIntent?(): void
 }
 
 export type AuthChange =
-  | { type: 'signed_in'; user: AccountUser; fresh: boolean }
+  | { type: 'signed_in'; user: AccountUser }
   | { type: 'updated'; user: AccountUser }
   | { type: 'signed_out' }
 

@@ -12,6 +12,7 @@ import {
 } from '@/lib/account'
 import { AccountSheet } from './account-sheet'
 import { NamePrompt } from './name-prompt'
+import { RegistrationDialog, type RegistrationStep } from './registration-dialog'
 
 interface AccountContextValue {
   account: AccountState
@@ -58,6 +59,9 @@ export function AccountProvider({
   const [sheet, setSheet] = useState<{ open: boolean; mode: AuthMode }>({ open: false, mode: 'sign_up' })
   const [namePrompt, setNamePrompt] = useState<{ open: boolean; prefill: string }>({ open: false, prefill: '' })
 
+  // A signed-in Google account that has not finished registration. The app stays in guest mode meanwhile.
+  const [registration, setRegistration] = useState<{ user: AccountUser; step: RegistrationStep } | null>(null)
+  const registrationRef = useRef<string | null>(null)
   const [redirectNotice, setRedirectNotice] = useState<AuthErrorCode | null>(null)
 
   const { updateSettings, status } = store
@@ -67,6 +71,16 @@ export function AccountProvider({
   knownUserRef.current = store.settings.account
   const adoptUser = useCallback(
     async (user: AccountUser, isNew: boolean) => {
+      if (user.needsRegistration) {
+        // Repeated SIGNED_IN / restore for the same unfinished account must not stack or reset the dialog.
+        if (registrationRef.current === user.id) return
+        registrationRef.current = user.id
+        currentRef.current = { status: 'guest' }
+        setAccount({ status: 'guest' })
+        setSheet((p) => ({ ...p, open: false }))
+        setRegistration({ user, step: client.googleIntent?.() === 'sign_in' ? 'not_found' : 'complete' })
+        return
+      }
       // Supabase repeats SIGNED_IN on tab refocus; an unchanged session must not close or reopen anything.
       const same = currentRef.current.status === 'signed_in' && currentRef.current.user.id === user.id
       currentRef.current = { status: 'signed_in', user }
@@ -84,7 +98,7 @@ export function AccountProvider({
       })
       setSheet((p) => ({ ...p, open: false }))
       // Only a genuinely new account with no usable name anywhere, asked once per account.
-      if (!isNew || user.namePromptDone || accountName || localName || promptedRef.current.has(user.id)) return
+      if (!(isNew || user.namePromptPending) || user.namePromptDone || accountName || localName || promptedRef.current.has(user.id)) return
       promptedRef.current.add(user.id)
       const providerFirst = firstNameFrom(user.providerName)
       if (providerFirst) {
@@ -116,10 +130,13 @@ export function AccountProvider({
       if (change.type === 'signed_out') {
         currentRef.current = { status: 'guest' }
         setAccount({ status: 'guest' })
+        registrationRef.current = null
+        setRegistration(null)
       } else if (change.type === 'updated') {
+        if (change.user.needsRegistration || registrationRef.current === change.user.id) return
         currentRef.current = { status: 'signed_in', user: change.user }
         setAccount({ status: 'signed_in', user: change.user })
-      } else void adoptUser(change.user, change.fresh)
+      } else void adoptUser(change.user, false)
     })
     return () => {
       active = false
@@ -156,10 +173,38 @@ export function AccountProvider({
     [account, client, adoptUser, redirectNotice],
   )
 
+  const finishRegistration = async (name: string) => {
+    const pending = registration
+    if (!pending) return { ok: true as const }
+    const r = (await client.completeRegistration?.(name)) ?? { ok: false as const, error: 'not_configured' as const }
+    if (!r.ok) return r
+    client.clearGoogleIntent?.()
+    registrationRef.current = null
+    setRegistration(null)
+    const displayName = name || pending.user.displayName || null
+    await adoptUser({ ...pending.user, displayName, namePromptDone: true, namePromptPending: false, needsRegistration: false }, false)
+    return r
+  }
+
+  const cancelRegistration = async () => {
+    client.clearGoogleIntent?.()
+    await client.signOut()
+    registrationRef.current = null
+    setRegistration(null)
+    currentRef.current = { status: 'guest' }
+    setAccount({ status: 'guest' })
+  }
+
   return (
     <AccountContext.Provider value={value}>
       {children}
       <AccountSheet open={sheet.open} mode={sheet.mode} onOpenChange={(open) => setSheet((p) => ({ ...p, open }))} />
+      <RegistrationDialog
+        state={registration}
+        onCreate={() => setRegistration((r) => (r ? { ...r, step: 'complete' } : r))}
+        onFinish={finishRegistration}
+        onCancel={cancelRegistration}
+      />
       <NamePrompt
         open={namePrompt.open}
         prefill={namePrompt.prefill}

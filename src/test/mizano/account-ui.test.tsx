@@ -17,6 +17,8 @@ vi.mock('@/components/providers/use-action', () => ({ useAction: () => (fn: () =
 const { AccountProvider } = await import('@/components/account/account-provider')
 const { AuthPanel } = await import('@/components/account/auth-panel')
 const { MizoScreen } = await import('@/components/mizo/mizo-screen')
+const { useAccount } = await import('@/components/account/account-provider')
+const useAccountState = () => useAccount().account
 
 function fakeClient(overrides: Partial<AuthClient> = {}): AuthClient {
   return {
@@ -310,7 +312,7 @@ describe('session and guest data', () => {
     )
     const state = () => container.querySelector('[data-mizo]')?.getAttribute('data-mizo')
     expect(state()).toBe('needs_account')
-    act(() => emit({ type: 'signed_in', user, fresh: false }))
+    act(() => emit({ type: 'signed_in', user }))
     await waitFor(() => expect(state()).toBe('open'))
     act(() => emit({ type: 'signed_out' }))
     await waitFor(() => expect(state()).toBe('needs_account'))
@@ -389,21 +391,21 @@ describe('name prompt', () => {
 
   it('is not shown on an ordinary sign-in', async () => {
     const { emit } = setup()
-    emit({ type: 'signed_in', user: base, fresh: false })
+    emit({ type: 'signed_in', user: base })
     await waitFor(() => expect(store.settings.account.userId).toBe('n1'))
     expect(prompt()).toBeNull()
   })
 
   it('is not shown when the account already has a name, and that name fills the device', async () => {
     const { emit } = setup()
-    emit({ type: 'signed_in', user: { ...base, displayName: 'Omar' }, fresh: true })
+    emit({ type: 'signed_in', user: { ...base, namePromptPending: true, displayName: 'Omar' } })
     await waitFor(() => expect(store.settings.account.displayName).toBe('Omar'))
     expect(prompt()).toBeNull()
   })
 
   it('uses the Google name for a new account instead of asking', async () => {
     const { emit, updateProfile } = setup()
-    emit({ type: 'signed_in', user: { ...base, providerName: 'Sara Ali' }, fresh: true })
+    emit({ type: 'signed_in', user: { ...base, namePromptPending: true, providerName: 'Sara Ali' } })
     await waitFor(() => expect(store.settings.account.displayName).toBe('Sara'))
     expect(updateProfile).toHaveBeenCalledWith({ displayName: 'Sara' })
     expect(prompt()).toBeNull()
@@ -411,26 +413,126 @@ describe('name prompt', () => {
 
   it('asks a new nameless account once, saves the name to the account, and does not loop', async () => {
     const { emit, updateProfile } = setup()
-    emit({ type: 'signed_in', user: base, fresh: true })
+    emit({ type: 'signed_in', user: { ...base, namePromptPending: true } })
     await screen.findByRole('heading', { name: 'What should we call you?' })
     fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Mona' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(updateProfile).toHaveBeenCalledWith({ displayName: 'Mona' }))
     expect(store.settings.account.displayName).toBe('Mona')
-    emit({ type: 'signed_in', user: base, fresh: true })
+    emit({ type: 'signed_in', user: { ...base, namePromptPending: true } })
     await waitFor(() => expect(prompt()).toBeNull())
   })
 
   it('skipping is remembered on the account, and a flagged account is never asked again', async () => {
     const { emit, updateProfile } = setup()
-    emit({ type: 'signed_in', user: base, fresh: true })
+    emit({ type: 'signed_in', user: { ...base, namePromptPending: true } })
     await screen.findByRole('heading', { name: 'What should we call you?' })
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
     await waitFor(() => expect(updateProfile).toHaveBeenCalledWith({ namePromptDone: true }))
     store.settings = defaultSettings()
     const again = setup()
-    again.emit({ type: 'signed_in', user: { ...base, namePromptDone: true }, fresh: true })
+    again.emit({ type: 'signed_in', user: { ...base, namePromptPending: true, namePromptDone: true } })
     await waitFor(() => expect(store.settings.account.userId).toBe('n1'))
     expect(prompt()).toBeNull()
+  })
+})
+
+describe('Google registration', () => {
+  const google = { id: 'g1', email: 'g@x.co', providerName: 'Sara Ali', needsRegistration: true }
+  function setup(over: Partial<AuthClient> = {}, intent: AuthMode | null = null) {
+    let emit: (c: AuthChange) => void = () => {}
+    const client = fakeClient({
+      subscribe: (l) => ((emit = l), () => {}),
+      googleIntent: () => intent,
+      clearGoogleIntent: vi.fn(),
+      completeRegistration: vi.fn(async () => ({ ok: true as const })),
+      ...over,
+    })
+    let seen: AccountState = { status: 'guest' }
+    function Probe() {
+      seen = useAccountState()
+      return null
+    }
+    render(
+      <AccountProvider client={client}>
+        <Probe />
+        <MizoScreen />
+      </AccountProvider>,
+    )
+    return { client, emit: (c: AuthChange) => act(() => emit(c)), state: () => seen }
+  }
+  const finishTitle = () => screen.queryByRole('heading', { name: 'Finish creating your account' })
+  const notFound = () => screen.queryByRole('heading', { name: 'No Mizano account found' })
+
+  it('a registered Google user goes straight in, with no dialog', async () => {
+    const { emit, state } = setup({}, 'sign_in')
+    emit({ type: 'signed_in', user: { ...google, needsRegistration: false, displayName: 'Sara' } })
+    await waitFor(() => expect(state().status).toBe('signed_in'))
+    expect(finishTitle()).toBeNull()
+    expect(notFound()).toBeNull()
+  })
+
+  it('a new Google user from Sign up must finish registration before entering, and Mizo stays gated meanwhile', async () => {
+    const { emit, state, client } = setup({}, 'sign_up')
+    emit({ type: 'signed_in', user: google })
+    await screen.findByRole('heading', { name: 'Finish creating your account' })
+    expect(state().status).toBe('guest')
+    expect(screen.getByText('Mizo is for Mizano accounts')).toBeInTheDocument()
+    expect(screen.getByLabelText('Display name')).toHaveValue('Sara')
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    await waitFor(() => expect(state().status).toBe('signed_in'))
+    expect(client.completeRegistration).toHaveBeenCalledWith('Sara')
+    expect(store.settings.account).toMatchObject({ userId: 'g1', displayName: 'Sara' })
+    expect(finishTitle()).toBeNull()
+  })
+
+  it('a new Google user from Sign in sees "No Mizano account found" and can create the account', async () => {
+    const { emit, state } = setup({}, 'sign_in')
+    emit({ type: 'signed_in', user: google })
+    await screen.findByRole('heading', { name: 'No Mizano account found' })
+    expect(screen.getByText(/may already have created a sign-in record/)).toBeInTheDocument()
+    expect(state().status).toBe('guest')
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    await screen.findByRole('heading', { name: 'Finish creating your account' })
+  })
+
+  it('cancel signs out on this device and keeps guest data untouched', async () => {
+    store.settings = { ...defaultSettings(), dayStartHour: 5, account: { userId: '', displayName: 'Guest name', avatar: null } } as Settings
+    const before = JSON.stringify(store.settings)
+    const { emit, state, client } = setup({}, 'sign_in')
+    emit({ type: 'signed_in', user: google })
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(client.signOut).toHaveBeenCalled())
+    await waitFor(() => expect(notFound()).toBeNull())
+    expect(state().status).toBe('guest')
+    expect(client.clearGoogleIntent).toHaveBeenCalled()
+    expect(client.completeRegistration).not.toHaveBeenCalled()
+    expect(JSON.stringify(store.settings)).toBe(before)
+  })
+
+  it('a restored unfinished session after reload goes back to completion (neutral wording without intent)', async () => {
+    setup({ restore: async () => google }, null)
+    await screen.findByRole('heading', { name: 'Finish creating your account' })
+  })
+
+  it('repeated SIGNED_IN for the same unfinished account shows one dialog and keeps its step', async () => {
+    const { emit } = setup({}, 'sign_in')
+    emit({ type: 'signed_in', user: google })
+    fireEvent.click(await screen.findByRole('button', { name: 'Create account' }))
+    await screen.findByRole('heading', { name: 'Finish creating your account' })
+    emit({ type: 'signed_in', user: google })
+    emit({ type: 'updated', user: google })
+    expect(screen.getAllByRole('heading', { name: 'Finish creating your account' })).toHaveLength(1)
+    expect(notFound()).toBeNull()
+  })
+
+  it('a failed metadata write keeps the step open with an error', async () => {
+    const { emit, state } = setup({ completeRegistration: vi.fn(async () => ({ ok: false as const, error: 'network' as const })) }, 'sign_up')
+    emit({ type: 'signed_in', user: google })
+    await screen.findByRole('heading', { name: 'Finish creating your account' })
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't reach the server")
+    expect(finishTitle()).not.toBeNull()
+    expect(state().status).toBe('guest')
   })
 })

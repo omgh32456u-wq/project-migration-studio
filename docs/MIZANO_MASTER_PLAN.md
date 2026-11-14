@@ -392,3 +392,8 @@ Whenever work is implemented:
 - Guest data: IndexedDB `track-meals-macros` and `tmm:*` untouched; no guest-to-account migration.
 - Tests: unit and component tests for sign-up/sign-in separation, confirmation, error mapping, Google provider check, session restore/events, redirect errors, ASCII rules and guest-settings preservation.
 - Pending manual Supabase settings: Site URL (currently not the app URL), Redirect URLs for the preview and published URLs, Google OAuth client redirect URI `https://ejgimkfnydgefoweasmr.supabase.co/auth/v1/callback`. Real inbox confirmation, Google round trip and Android deep links are unverified.
+
+## Status update — Google registration flow (2026-11-14)
+- Decision: Supabase creates the Auth user on first Google use regardless of the button pressed, so the app gates entry instead of blocking creation. A Google-only account enters Mizano only when `user_metadata.mizano_registered` is true (legacy: `name_prompt_done` or a non-empty `display_name` written by this app). Accounts with an email identity are never gated. The 10-minute timestamp heuristic is removed.
+- Sign up + new Google user: required "Finish creating your account" step (name optional, prefilled from Google). Sign in + new Google user: "No Mizano account found" (explains a sign-in record may already exist) with Create account / Cancel (local sign-out). The app stays in guest mode until the marker is saved; a failed save keeps the step open with an error; reloads return to the step.
+- Status: Implemented/unverified. Unit and component tests pass; a real Google round trip, identity linking and Android deep links are not tested.

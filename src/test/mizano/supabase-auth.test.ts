@@ -9,6 +9,7 @@ function fakeAuth(over: Partial<SupabaseAuthLike> = {}): SupabaseAuthLike {
     signInWithPassword: vi.fn(async () => ({ data: { user: null, session: null }, error: { code: 'invalid_credentials', status: 400 } })),
     signInWithOAuth: vi.fn(async () => ({ error: null })),
     resend: vi.fn(async () => ({ error: null })),
+    updateUser: vi.fn(async () => ({ error: null })),
     signOut: vi.fn(async () => ({ error: null })),
     getSession: vi.fn(async () => ({ data: { session: null } })),
     onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
@@ -21,17 +22,17 @@ const clientFor = (auth: SupabaseAuthLike, googleEnabled: boolean | null = true)
 describe('Supabase sign-up', () => {
   it('needs email confirmation when no session comes back, and is not signed in', async () => {
     const auth = fakeAuth()
-    expect(await clientFor(auth).signUpWithEmail('me@x.co', 'Mizano#2026')).toEqual({ ok: true, needsConfirmation: true })
+    expect(await clientFor(auth).signUpWithEmail('me@x.co', 'Mizano#2026')).toMatchObject({ ok: true, needsConfirmation: true })
     expect(auth.signUp).toHaveBeenCalledWith(expect.objectContaining({ email: 'me@x.co', password: 'Mizano#2026' }))
     expect(auth.signInWithPassword).not.toHaveBeenCalled()
   })
   it('reports an existing address (no identities) instead of signing into it', async () => {
     const auth = fakeAuth({ signUp: vi.fn(async () => ({ data: { user: { ...user, identities: [] }, session: null }, error: null })) })
-    expect(await clientFor(auth).signUpWithEmail('me@x.co', 'Mizano#2026')).toEqual({ ok: false, error: 'email_taken' })
+    expect(await clientFor(auth).signUpWithEmail('me@x.co', 'Mizano#2026')).toMatchObject({ ok: false, error: 'email_taken' })
   })
   it('is signed in only when a real session comes back', async () => {
     const auth = fakeAuth({ signUp: vi.fn(async () => ({ data: { user, session: { user } }, error: null })) })
-    expect(await clientFor(auth).signUpWithEmail('me@x.co', 'Mizano#2026')).toEqual({
+    expect(await clientFor(auth).signUpWithEmail('me@x.co', 'Mizano#2026')).toMatchObject({
       ok: true,
       needsConfirmation: false,
       user: { id: 'u1', email: 'me@x.co', providerName: 'Omar M' },
@@ -79,7 +80,7 @@ describe('Supabase session', () => {
   it('restores a saved session and signs out only on this device', async () => {
     const auth = fakeAuth({ getSession: vi.fn(async () => ({ data: { session: { user } } })) })
     const client = clientFor(auth)
-    expect(await client.restore?.()).toEqual({ id: 'u1', email: 'me@x.co', providerName: 'Omar M' })
+    expect(await client.restore?.()).toMatchObject({ id: 'u1', email: 'me@x.co', providerName: 'Omar M' })
     await client.signOut()
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' })
   })
@@ -109,5 +110,16 @@ describe('redirect errors', () => {
     expect(window.location.hash).toBe('')
     expect(window.location.search).toBe('?tab=1')
     expect(takeAuthRedirectError()).toBeNull()
+  })
+})
+
+describe('profile metadata', () => {
+  it('reads the chosen name and prompt flag, and saves them with updateUser', async () => {
+    const { toAccountUser } = await import('@/lib/supabase-auth')
+    expect(toAccountUser({ id: 'a', user_metadata: { display_name: ' Omar ', name_prompt_done: true } })).toMatchObject({ displayName: 'Omar', namePromptDone: true })
+    const updateUser = vi.fn(async () => ({ error: null }))
+    const client = createSupabaseAuthClient({ load: async () => ({ auth: { updateUser } as unknown as SupabaseAuthLike }) })
+    expect(await client.updateProfile!({ displayName: 'Omar' })).toEqual({ ok: true })
+    expect(updateUser).toHaveBeenCalledWith({ data: { name_prompt_done: true, display_name: 'Omar' } })
   })
 })

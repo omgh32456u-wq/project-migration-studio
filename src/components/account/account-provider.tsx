@@ -73,16 +73,29 @@ export function AccountProvider({
       setAccount({ status: 'signed_in', user })
       if (same && !isNew) return
       const known = knownUserRef.current
+      const localName = known.userId === user.id ? known.displayName : ''
+      const accountName = user.displayName ?? ''
       // The on-device name/photo cache belongs to one account; another account starts empty.
-      await updateSettings((s) => (s.account.userId === user.id ? s : { ...s, account: { userId: user.id, displayName: '', avatar: null } }))
+      // A name saved on the account fills an empty local name, so devices agree.
+      await updateSettings((s) => {
+        const base = s.account.userId === user.id ? s.account : { userId: user.id, displayName: '', avatar: null }
+        const displayName = base.displayName || accountName
+        return base === s.account && displayName === s.account.displayName ? s : { ...s, account: { ...base, displayName } }
+      })
       setSheet((p) => ({ ...p, open: false }))
-      // Ask for a name only for a new account that has none saved on this device yet.
-      if (isNew && !promptedRef.current.has(user.id) && !(known.userId === user.id && known.displayName)) {
-        promptedRef.current.add(user.id)
-        setNamePrompt({ open: true, prefill: firstNameFrom(user.providerName) })
+      // Only a genuinely new account with no usable name anywhere, asked once per account.
+      if (!isNew || user.namePromptDone || accountName || localName || promptedRef.current.has(user.id)) return
+      promptedRef.current.add(user.id)
+      const providerFirst = firstNameFrom(user.providerName)
+      if (providerFirst) {
+        // Google already gave a name: use it instead of asking.
+        await updateSettings((s) => (s.account.userId === user.id ? { ...s, account: { ...s.account, displayName: providerFirst } } : s))
+        void client.updateProfile?.({ displayName: providerFirst })
+        return
       }
+      setNamePrompt({ open: true, prefill: '' })
     },
-    [updateSettings],
+    [updateSettings, client],
   )
 
   // Once local data is loaded: restore a saved session, then follow identity changes.
@@ -151,6 +164,8 @@ export function AccountProvider({
         open={namePrompt.open}
         prefill={namePrompt.prefill}
         onClose={() => setNamePrompt((p) => ({ ...p, open: false }))}
+        // Saved or skipped, the account remembers it so the prompt never returns.
+        onDone={(name) => void client.updateProfile?.(name ? { displayName: name } : { namePromptDone: true })}
       />
     </AccountContext.Provider>
   )

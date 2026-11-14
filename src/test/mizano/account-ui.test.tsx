@@ -111,9 +111,9 @@ describe('auth entry', () => {
     expect(await screen.findByRole('status')).toHaveTextContent("Accounts aren't switched on")
   })
 
-  it('asks "What should we call you?" after a new account, prefilled from the Google name', async () => {
+  it('asks "What should we call you?" after a new email account with no name', async () => {
     const client = fakeClient({
-      signUpWithEmail: vi.fn(async () => ({ ok: true as const, needsConfirmation: false as const, user: { id: 'u9', email: 'o@m.co', providerName: 'Omar Mohamed' } })),
+      signUpWithEmail: vi.fn(async () => ({ ok: true as const, needsConfirmation: false as const, user: { id: 'u9', email: 'o@m.co', providerName: null } })),
     })
     render(
       <AccountProvider client={client}>
@@ -124,8 +124,8 @@ describe('auth entry', () => {
     fillEmail('o@m.co', STRONG, STRONG)
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     expect(await screen.findByRole('heading', { name: 'What should we call you?' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Display name')).toHaveValue('Omar')
     expect(screen.getByLabelText('Display name')).toHaveAttribute('placeholder', 'Your name')
+    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Omar' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(store.settings.account).toEqual({ userId: 'u9', displayName: 'Omar', avatar: null }))
   })
@@ -349,5 +349,88 @@ describe('session and guest data', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Google' }))
     expect(await screen.findByText(/This sign-in option isn't switched on yet/)).toBeInTheDocument()
+  })
+})
+
+describe('failed sign-in → create account', () => {
+  it('offers sign-up after a failed sign-in, keeps the email, and never creates an account by itself', async () => {
+    const client = fakeClient()
+    render(
+      <AccountProvider client={client}>
+        <Panel initial="sign_in" />
+      </AccountProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with email' }))
+    fillEmail('new@x.co', 'whatever')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    const link = await screen.findByRole('button', { name: 'Create an account' })
+    expect(client.signUpWithEmail).not.toHaveBeenCalled()
+    fireEvent.click(link)
+    expect(screen.getByLabelText('Email')).toHaveValue('new@x.co')
+    expect(screen.getByLabelText('Confirm password')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create an account' })).toBeNull()
+    expect(client.signUpWithEmail).not.toHaveBeenCalled()
+  })
+})
+
+describe('name prompt', () => {
+  const base = { id: 'n1', email: 'n@x.co', providerName: null }
+  function setup(updateProfile = vi.fn(async () => ({ ok: true as const }))) {
+    let emit: (c: AuthChange) => void = () => {}
+    const client = fakeClient({ subscribe: (l) => ((emit = l), () => {}), updateProfile })
+    render(
+      <AccountProvider client={client}>
+        <div />
+      </AccountProvider>,
+    )
+    return { emit: (c: AuthChange) => act(() => emit(c)), updateProfile }
+  }
+  const prompt = () => screen.queryByRole('heading', { name: 'What should we call you?' })
+
+  it('is not shown on an ordinary sign-in', async () => {
+    const { emit } = setup()
+    emit({ type: 'signed_in', user: base, fresh: false })
+    await waitFor(() => expect(store.settings.account.userId).toBe('n1'))
+    expect(prompt()).toBeNull()
+  })
+
+  it('is not shown when the account already has a name, and that name fills the device', async () => {
+    const { emit } = setup()
+    emit({ type: 'signed_in', user: { ...base, displayName: 'Omar' }, fresh: true })
+    await waitFor(() => expect(store.settings.account.displayName).toBe('Omar'))
+    expect(prompt()).toBeNull()
+  })
+
+  it('uses the Google name for a new account instead of asking', async () => {
+    const { emit, updateProfile } = setup()
+    emit({ type: 'signed_in', user: { ...base, providerName: 'Sara Ali' }, fresh: true })
+    await waitFor(() => expect(store.settings.account.displayName).toBe('Sara'))
+    expect(updateProfile).toHaveBeenCalledWith({ displayName: 'Sara' })
+    expect(prompt()).toBeNull()
+  })
+
+  it('asks a new nameless account once, saves the name to the account, and does not loop', async () => {
+    const { emit, updateProfile } = setup()
+    emit({ type: 'signed_in', user: base, fresh: true })
+    await screen.findByRole('heading', { name: 'What should we call you?' })
+    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Mona' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(updateProfile).toHaveBeenCalledWith({ displayName: 'Mona' }))
+    expect(store.settings.account.displayName).toBe('Mona')
+    emit({ type: 'signed_in', user: base, fresh: true })
+    await waitFor(() => expect(prompt()).toBeNull())
+  })
+
+  it('skipping is remembered on the account, and a flagged account is never asked again', async () => {
+    const { emit, updateProfile } = setup()
+    emit({ type: 'signed_in', user: base, fresh: true })
+    await screen.findByRole('heading', { name: 'What should we call you?' })
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    await waitFor(() => expect(updateProfile).toHaveBeenCalledWith({ namePromptDone: true }))
+    store.settings = defaultSettings()
+    const again = setup()
+    again.emit({ type: 'signed_in', user: { ...base, namePromptDone: true }, fresh: true })
+    await waitFor(() => expect(store.settings.account.userId).toBe('n1'))
+    expect(prompt()).toBeNull()
   })
 })

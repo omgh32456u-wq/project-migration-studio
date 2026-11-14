@@ -222,6 +222,7 @@ export function AuthPanel({
           }}
           backIcon={<Back aria-hidden />}
           onNeedsConfirmation={showConfirm}
+          onSwitchToSignUp={() => switchMode('sign_up')}
         />
       )}
 
@@ -262,6 +263,7 @@ function EmailForm({
   onBack,
   backIcon,
   onNeedsConfirmation,
+  onSwitchToSignUp,
 }: {
   mode: AuthMode
   /** Fixed-height onboarding card: sign-up uses two columns on short landscape screens. */
@@ -269,6 +271,8 @@ function EmailForm({
   onBack: () => void
   backIcon: ReactNode
   onNeedsConfirmation: (email: string) => void
+  /** Offered after a failed sign-in; the typed email is kept. */
+  onSwitchToSignUp?: () => void
 }) {
   const { t } = useStore().i18n
   const account = useAccount()
@@ -280,6 +284,11 @@ function EmailForm({
   const rulesId = useId()
   const matchId = useId()
   const signUp = mode === 'sign_up'
+  // Switching mode keeps the typed email; old errors and the confirmation box start fresh.
+  useEffect(() => {
+    setError(null)
+    setConfirm('')
+  }, [mode])
   const grid = compact && signUp
   const at = (cls: string) => (grid ? cls : undefined)
   // Sign-up stays disabled until every rule passes; sign-in only blocks while a request runs.
@@ -389,6 +398,14 @@ function EmailForm({
       {formError && (
         <p role="alert" className={cn('rounded-2xl bg-muted px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground', at('landscape-short:col-span-3 landscape-short:row-start-3'))}>
           {formError}
+          {!signUp && error === 'invalid_credentials' && onSwitchToSignUp && (
+            <>
+              {' '}
+              <button type="button" className="font-semibold text-primary underline underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none" onClick={onSwitchToSignUp}>
+                {t('auth.createInstead')}
+              </button>
+            </>
+          )}
         </p>
       )}
       <div className={cn('flex gap-2', at('landscape-short:col-start-2 landscape-short:row-start-2 landscape-short:self-end'))}>

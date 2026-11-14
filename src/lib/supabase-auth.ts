@@ -40,6 +40,7 @@ export interface SupabaseAuthLike {
   resend(args: { type: 'signup'; email: string; options?: { emailRedirectTo?: string } }): Promise<{ error: AuthErrorLike | null }>
   signOut(args?: { scope?: 'local' | 'global' | 'others' }): Promise<{ error: AuthErrorLike | null }>
   getSession(): Promise<{ data: { session: SessionLike } }>
+  updateUser(args: { data: Record<string, unknown> }): Promise<{ error: AuthErrorLike | null }>
   onAuthStateChange(cb: (event: string, session: SessionLike) => void): { data: { subscription: { unsubscribe(): void } } }
 }
 
@@ -85,7 +86,8 @@ const TEN_MINUTES = 10 * 60 * 1000
 export function toAccountUser(u: SupabaseUserLike): AccountUser {
   const meta = u.user_metadata ?? {}
   const name = typeof meta['full_name'] === 'string' ? meta['full_name'] : typeof meta['name'] === 'string' ? meta['name'] : null
-  return { id: u.id, email: u.email ?? null, providerName: name }
+  const display = typeof meta['display_name'] === 'string' && meta['display_name'].trim() ? meta['display_name'].trim() : null
+  return { id: u.id, email: u.email ?? null, providerName: name, displayName: display, namePromptDone: meta['name_prompt_done'] === true }
 }
 
 /** A first sign-in shortly after the account was created (registration, or confirming the email). */
@@ -178,6 +180,17 @@ export function createSupabaseAuthClient(opts: SupabaseAuthOptions = {}): AuthCl
       guard<{ ok: true } | { ok: false; error: AuthErrorCode }>(
         async (auth) => {
           const { error } = await auth.resend({ type: 'signup', email, options: { emailRedirectTo: origin() } })
+          return error ? { ok: false, error: mapAuthError(error) } : { ok: true }
+        },
+        (error) => ({ ok: false, error }),
+      ),
+
+    updateProfile: (data) =>
+      guard<{ ok: true } | { ok: false; error: AuthErrorCode }>(
+        async (auth) => {
+          const meta: Record<string, unknown> = { name_prompt_done: true }
+          if (data.displayName !== undefined) meta['display_name'] = data.displayName
+          const { error } = await auth.updateUser({ data: meta })
           return error ? { ok: false, error: mapAuthError(error) } : { ok: true }
         },
         (error) => ({ ok: false, error }),

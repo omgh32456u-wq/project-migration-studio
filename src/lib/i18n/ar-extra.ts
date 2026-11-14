@@ -49,6 +49,7 @@ export const arExtra = {
   'auth.error.missing_password': 'أدخل كلمة المرور.',
   'auth.error.weak_password': 'يجب أن تستوفي كلمة المرور كل المتطلبات أدناه.',
   'auth.error.password_mismatch': 'كلمتا المرور غير متطابقتين.',
+  'auth.createInstead': 'إنشاء حساب',
   'auth.error.invalid_credentials': 'البريد الإلكتروني وكلمة المرور لا يطابقان أي حساب. تحقّق منهما، أو أنشئ حسابًا إن كنت جديدًا.',
   'auth.error.email_taken': 'قد يكون لهذا البريد حساب بالفعل. جرّب تسجيل الدخول.',
   'auth.error.network': 'تعذّر الوصول إلى الخادم. تحقّق من الاتصال وحاول مرة أخرى.',

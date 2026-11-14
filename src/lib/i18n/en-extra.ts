@@ -52,6 +52,7 @@ export const enExtra = {
   'auth.error.missing_password': 'Enter your password.',
   'auth.error.weak_password': 'Your password must meet every requirement below.',
   'auth.error.password_mismatch': "Passwords don't match.",
+  'auth.createInstead': 'Create an account',
   'auth.error.invalid_credentials': "That email and password don't match an account. Check them, or create an account if you're new.",
   'auth.error.email_taken': 'This email may already have an account. Try signing in instead.',
   'auth.error.network': "Couldn't reach the server. Check your connection and try again.",

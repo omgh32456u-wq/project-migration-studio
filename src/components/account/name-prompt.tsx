@@ -7,20 +7,44 @@ import { useAction } from '@/components/providers/use-action'
 import { MAX_DISPLAY_NAME } from '@/lib/defaults'
 
 /** Asked once after a new account is created. Skipping leaves the name blank; the account still exists. */
-export function NamePrompt({ open, prefill, onClose }: { open: boolean; prefill: string; onClose: () => void }) {
+export function NamePrompt({
+  open,
+  prefill,
+  onClose,
+  onDone,
+}: {
+  open: boolean
+  prefill: string
+  onClose: () => void
+  /** Called once with the saved name, or '' when skipped or dismissed. */
+  onDone?: (name: string) => void
+}) {
   const store = useStore()
   const run = useAction()
   const { t } = store.i18n
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (o) return
+        onDone?.('')
+        onClose()
+      }}
+    >
       <DialogContent className="sm:max-w-sm" closeLabel={t('common.close')}>
         {open && (
           <NameForm
             key={prefill}
             prefill={prefill}
-            onSkip={onClose}
+            onSkip={() => {
+              onDone?.('')
+              onClose()
+            }}
             onSave={(name) =>
-              void run(() => store.updateSettings((s) => ({ ...s, account: { ...s.account, displayName: name } })), { success: t('account.saved') }).then(onClose)
+              void run(() => store.updateSettings((s) => ({ ...s, account: { ...s.account, displayName: name } })), { success: t('account.saved') }).then(() => {
+                onDone?.(name)
+                onClose()
+              })
             }
           />
         )}

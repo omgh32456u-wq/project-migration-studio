@@ -11,6 +11,10 @@ export interface AccountUser {
   email: string | null
   /** Full name from the identity provider (e.g. Google), used only to prefill the name prompt. */
   providerName: string | null
+  /** Name the user chose in Mizano, saved in the account's metadata. */
+  displayName?: string | null
+  /** The name prompt was answered or skipped once; it is never asked again for this account. */
+  namePromptDone?: boolean
 }
 
 export type AccountState = { status: 'guest' } | { status: 'signed_in'; user: AccountUser }
@@ -57,6 +61,8 @@ export interface AuthClient {
   restore?(): Promise<AccountUser | null>
   /** Identity changes from outside a direct call (email link, Google redirect, another tab). */
   subscribe?(listener: (change: AuthChange) => void): () => void
+  /** Saves profile fields to the signed-in account's metadata. */
+  updateProfile?(data: { displayName?: string; namePromptDone?: boolean }): Promise<{ ok: true } | { ok: false; error: AuthErrorCode }>
 }
 
 export type AuthChange =

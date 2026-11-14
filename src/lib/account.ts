@@ -1,9 +1,9 @@
 /**
  * Account model shared by the sign-in UI, Mizo access and the profile editor.
  *
- * No sign-in service is connected in this build, so the app uses `unconfiguredAuthClient`, which
- * never creates sessions. A real client (e.g. Lovable Cloud) implements `AuthClient`; the UI only
- * talks to this interface. Age is deliberately not part of any account or access rule.
+ * The app's real client is the Supabase one in `supabase-auth.ts`; `unconfiguredAuthClient` never
+ * creates sessions and is the safe default (and what tests use). The UI only talks to `AuthClient`.
+ * Age is deliberately not part of any account or access rule.
  */
 
 export interface AccountUser {
@@ -27,6 +27,11 @@ export type AuthErrorCode =
   | 'email_taken'
   | 'network'
   | 'rate_limited'
+  | 'email_not_confirmed'
+  | 'signup_disabled'
+  | 'provider_disabled'
+  | 'oauth_failed'
+  | 'link_expired'
   | 'unknown'
 
 export type SignUpResult =
@@ -46,7 +51,18 @@ export interface AuthClient {
   /** Starts the Google redirect. `mode` is the user's stated intent (see AGENTS.md on its limits). */
   signInWithGoogle(mode: AuthMode): Promise<{ ok: true } | { ok: false; error: AuthErrorCode }>
   signOut(): Promise<void>
+  /** Sends the sign-up confirmation email again. */
+  resendConfirmation?(email: string): Promise<{ ok: true } | { ok: false; error: AuthErrorCode }>
+  /** The saved session's user on app start (works offline), or null. */
+  restore?(): Promise<AccountUser | null>
+  /** Identity changes from outside a direct call (email link, Google redirect, another tab). */
+  subscribe?(listener: (change: AuthChange) => void): () => void
 }
+
+export type AuthChange =
+  | { type: 'signed_in'; user: AccountUser; fresh: boolean }
+  | { type: 'updated'; user: AccountUser }
+  | { type: 'signed_out' }
 
 export const unconfiguredAuthClient: AuthClient = {
   configured: false,
@@ -67,14 +83,17 @@ export function isValidEmail(email: string): boolean {
 export const PASSWORD_RULES = ['length', 'upper', 'lower', 'number', 'special'] as const
 export type PasswordRule = (typeof PASSWORD_RULES)[number]
 
-/** Which rules a password meets. Unicode-aware, so Arabic-Indic digits count as numbers. */
+/**
+ * Which rules a password meets. Letters and digits are ASCII only (A–Z, a–z, 0–9). Any other
+ * non-whitespace character counts as special, including Unicode symbols, Arabic letters and Arabic-Indic digits.
+ */
 export function passwordChecks(password: string): Record<PasswordRule, boolean> {
   return {
     length: [...password].length >= MIN_PASSWORD_LENGTH,
-    upper: /\p{Lu}/u.test(password),
-    lower: /\p{Ll}/u.test(password),
-    number: /\p{Nd}/u.test(password),
-    special: /[^\p{L}\p{N}\s]/u.test(password),
+    upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[^A-Za-z0-9\s]/.test(password),
   }
 }
 

@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Circle, CircleCheck, CircleX, Eye, EyeOff, Mail, MailCheck, Smartphone, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, TextInput } from '@/components/common/controls'
@@ -96,7 +96,33 @@ export function AuthPanel({
   const [notice, setNotice] = useState<AuthErrorCode | null>(null)
   const [busy, setBusy] = useState(false)
   const [sentTo, setSentTo] = useState('')
+  const [resend, setResend] = useState<'idle' | 'sending' | 'sent'>('idle')
   const noticeId = useId()
+  const { redirectNotice, clearRedirectNotice } = account
+
+  // A returning Google redirect or email link that failed is explained here once.
+  useEffect(() => {
+    if (!redirectNotice) return
+    setNotice(redirectNotice)
+    clearRedirectNotice()
+  }, [redirectNotice, clearRedirectNotice])
+
+  const showConfirm = (email: string) => {
+    setSentTo(email)
+    setResend('idle')
+    setView('confirm')
+  }
+
+  const resendEmail = async () => {
+    setNotice(null)
+    setResend('sending')
+    const r = await account.resendConfirmation(sentTo)
+    if (r.ok) setResend('sent')
+    else {
+      setResend('idle')
+      setNotice(r.error)
+    }
+  }
   const signUp = mode === 'sign_up'
   const verb = signUp ? 'signup' : 'signin'
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft
@@ -195,19 +221,26 @@ export function AuthPanel({
             setView('options')
           }}
           backIcon={<Back aria-hidden />}
-          onNeedsConfirmation={(email) => {
-            setSentTo(email)
-            setView('confirm')
-          }}
+          onNeedsConfirmation={showConfirm}
         />
       )}
 
       {view === 'confirm' && (
         <div className="flex shrink-0 flex-col items-center gap-3 rounded-2xl bg-muted px-4 py-4 text-center">
           <MailCheck className="size-6 text-primary" aria-hidden />
-          <Button variant="outline" onClick={() => switchMode('sign_in')}>
-            {t('auth.toSignIn')}
-          </Button>
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {resend === 'sent' ? t('auth.confirm.resent') : t('auth.confirm.spam')}
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button variant="outline" disabled={resend === 'sending'} onClick={() => void resendEmail()}>
+              {resend === 'sending' ? t('auth.working') : t('auth.confirm.resend')}
+            </Button>
+            {signUp && (
+              <Button variant="ghost" onClick={() => switchMode('sign_in')}>
+                {t('auth.toSignIn')}
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -265,7 +298,9 @@ function EmailForm({
         else if (r.needsConfirmation) onNeedsConfirmation(email.trim())
       } else {
         const r = await account.signInWithEmail(email.trim(), password)
-        if (!r.ok) setError(r.error)
+        // An unconfirmed account gets the "check your email" view with a resend button.
+        if (!r.ok && r.error === 'email_not_confirmed') onNeedsConfirmation(email.trim())
+        else if (!r.ok) setError(r.error)
       }
     } catch {
       setError('network')

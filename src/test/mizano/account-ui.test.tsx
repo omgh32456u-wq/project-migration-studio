@@ -1,13 +1,13 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTranslator } from '@/lib/i18n'
 import { defaultSettings } from '@/lib/defaults'
-import type { AccountState, AuthClient, AuthMode, SignUpResult } from '@/lib/account'
+import type { AccountState, AuthChange, AuthClient, AuthMode, SignUpResult } from '@/lib/account'
 import type { Settings } from '@/lib/types'
 
 // Minimal store: real English strings, in-memory settings (no IndexedDB in jsdom).
-const store = { settings: defaultSettings() as Settings, i18n: createTranslator('en'), updateSettings: vi.fn() }
+const store = { status: 'ready' as const, settings: defaultSettings() as Settings, i18n: createTranslator('en'), updateSettings: vi.fn() }
 store.updateSettings.mockImplementation(async (fn: (s: Settings) => Settings) => {
   store.settings = fn(store.settings)
 })
@@ -282,5 +282,72 @@ describe('Mizo access', () => {
     const { container } = renderMizo({ status: 'signed_in', user: { id: 'u1', email: 'teen@x.co', providerName: null } })
     expect(container.querySelector('[data-mizo]')?.getAttribute('data-mizo')).toBe('open')
     expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull()
+  })
+})
+
+describe('session and guest data', () => {
+  const user = { id: 'u9', email: 'me@x.co', providerName: null }
+
+  it('restores a saved session on start, so Mizo opens without signing in again', async () => {
+    const client = fakeClient({ restore: vi.fn(async () => user) })
+    const { container } = render(
+      <AccountProvider client={client}>
+        <MizoScreen />
+      </AccountProvider>,
+    )
+    await waitFor(() => expect(container.querySelector('[data-mizo]')?.getAttribute('data-mizo')).toBe('open'))
+  })
+
+  it('follows sign-in and sign-out events, and never touches guest food data or settings', async () => {
+    let emit: (c: AuthChange) => void = () => {}
+    const client = fakeClient({ subscribe: (l) => ((emit = l), () => {}) })
+    store.settings = { ...defaultSettings(), dayStartMinutes: 240 }
+    const before = { ...store.settings }
+    const { container } = render(
+      <AccountProvider client={client}>
+        <MizoScreen />
+      </AccountProvider>,
+    )
+    const state = () => container.querySelector('[data-mizo]')?.getAttribute('data-mizo')
+    expect(state()).toBe('needs_account')
+    act(() => emit({ type: 'signed_in', user, fresh: false }))
+    await waitFor(() => expect(state()).toBe('open'))
+    act(() => emit({ type: 'signed_out' }))
+    await waitFor(() => expect(state()).toBe('needs_account'))
+    // Only the on-device name/photo cache is keyed to the account; everything else is unchanged.
+    const { account: _a, ...rest } = store.settings
+    const { account: _b, ...restBefore } = before
+    expect(rest).toEqual(restBefore)
+  })
+
+  it('signing in to an unconfirmed account shows "check your email" with a resend button', async () => {
+    const resendConfirmation = vi.fn(async () => ({ ok: true as const }))
+    const client = fakeClient({
+      signInWithEmail: vi.fn(async () => ({ ok: false as const, error: 'email_not_confirmed' as const })),
+      resendConfirmation,
+    })
+    render(
+      <AccountProvider client={client}>
+        <Panel initial="sign_in" />
+      </AccountProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with email' }))
+    fillEmail('me@x.co', 'old')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await screen.findByRole('heading', { name: 'Check your email' })
+    expect(client.signUpWithEmail).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Resend email' }))
+    await waitFor(() => expect(resendConfirmation).toHaveBeenCalledWith('me@x.co'))
+  })
+
+  it('shows a clear message when Google is not switched on, without leaving the app', async () => {
+    const client = fakeClient({ signInWithGoogle: vi.fn(async () => ({ ok: false as const, error: 'provider_disabled' as const })) })
+    render(
+      <AccountProvider client={client}>
+        <Panel initial="sign_in" />
+      </AccountProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with Google' }))
+    expect(await screen.findByText(/This sign-in option isn't switched on yet/)).toBeInTheDocument()
   })
 })

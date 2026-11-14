@@ -38,6 +38,20 @@ describe('password rules', () => {
     expect(passwordChecks('a_').special).toBe(true)
     expect(passwordChecks('Mizano#2026')).toEqual({ length: true, upper: true, lower: true, number: true, special: true })
   })
+  it('counts only ASCII A–Z, a–z and 0–9 as letters and digits', () => {
+    // Arabic letters and Arabic-Indic digits never satisfy the English letter/number rules…
+    expect(passwordChecks('مرحبا١٢٣')).toMatchObject({ upper: false, lower: false, number: false })
+    // …and non-ASCII Latin letters don't either.
+    expect(passwordChecks('ÉÀÜ')).toMatchObject({ upper: false })
+    expect(passwordChecks('éàü')).toMatchObject({ lower: false })
+  })
+  it('counts any other non-whitespace character as special, including Arabic letters and Unicode symbols', () => {
+    expect(passwordChecks('Abcdefg1م').special).toBe(true)
+    expect(passwordChecks('Abcdefg1٣').special).toBe(true)
+    expect(passwordChecks('Abcdefg1€').special).toBe(true)
+    expect(passwordChecks('Abcdefg1 \t').special).toBe(false)
+    expect(passwordChecks('Abcdefg1')).toMatchObject({ upper: true, lower: true, number: true, special: false })
+  })
   it('counts 8 characters, not 8 bytes', () => {
     expect(passwordChecks('Aa1!😀😀😀').length).toBe(false)
     expect(passwordChecks('Aa1!😀😀😀😀').length).toBe(true)

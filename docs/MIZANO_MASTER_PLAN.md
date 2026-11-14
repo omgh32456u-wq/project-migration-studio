@@ -384,3 +384,11 @@ Whenever work is implemented:
 5. Add known gaps and deferred follow-ups.
 
 **This document is the source of truth for scope and decisions. If an instruction from an AI tool conflicts with this document, stop and ask the user rather than silently changing the product.**
+
+
+## Status update — real Supabase email/Google sign-in (2026-11-14)
+- Status: **Implemented / unverified end-to-end.** Connected external Supabase project `ejgimkfnydgefoweasmr` (not Lovable Cloud). No tables, buckets, RLS, sync or Supabase settings were created or changed.
+- Implemented: separate email sign-up and sign-in (sign-in never creates an account); "check your email" state with resend when confirmation is required (project has email confirmation on); unconfirmed sign-in opens that state; session restored on app start (offline-capable) and identity changes followed; sign-out ends the session on this device only; Google via Supabase OAuth, refused with a clear message if the provider is off; failed email-link/Google redirects explained once; onboarding Auth step continues after sign-in. Password rules now ASCII A–Z / a–z / 0–9; any other non-whitespace character is special.
+- Guest data: IndexedDB `track-meals-macros` and `tmm:*` untouched; no guest-to-account migration.
+- Tests: unit and component tests for sign-up/sign-in separation, confirmation, error mapping, Google provider check, session restore/events, redirect errors, ASCII rules and guest-settings preservation.
+- Pending manual Supabase settings: Site URL (currently not the app URL), Redirect URLs for the preview and published URLs, Google OAuth client redirect URI `https://ejgimkfnydgefoweasmr.supabase.co/auth/v1/callback`. Real inbox confirmation, Google round trip and Android deep links are unverified.

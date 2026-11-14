@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
+import { useAccount } from '@/components/account/account-provider'
 import { AuthPanel } from '@/components/account/auth-panel'
 import type { AuthMode } from '@/lib/account'
 import { StepCard, StepHeader, type StepApi } from './onboarding-steps'
@@ -11,6 +12,14 @@ import { StepCard, StepHeader, type StepApi } from './onboarding-steps'
 export function AuthStep({ api, onSkip }: { api: StepApi; onSkip: () => void }) {
   const { t } = api
   const [mode, setMode] = useState<AuthMode>('sign_up')
+  const { account } = useAccount()
+  const next = useRef(onSkip)
+  next.current = onSkip
+  const signedIn = account.status === 'signed_in'
+  // Signing in here (directly, by email link or after the Google redirect) continues to the next step.
+  useEffect(() => {
+    if (signedIn) next.current()
+  }, [signedIn])
 
   return (
     <StepCard>

@@ -180,6 +180,17 @@ Agreed initial UI:
 
 Status 2026-11-14: Mizo destination added (route `/mizo`, centre of the 5-item bottom bar, same order in the desktop sidebar). Guests see a sign-up / sign-in prompt; signed-in users of any age see an honest "coming later" empty state. The chat composer and maintenance reply above are not built yet (still Agreed/not started). Implemented / verified in browser preview for guests only — no signed-in session is possible yet (see section 12).
 
+> Superseded 2026-11-14: the "under maintenance" placeholder reply phase above is replaced by the milestone roadmap below. Mizo never fakes replies.
+
+### Mizo milestone roadmap (agreed 2026-11-14)
+- **M1 — UI + page gate + local per-account history. Implemented / tests pass; signed-in preview unverified.** Guests only ever see the Sign up / Sign in invitation; the chat workspace and history never mount for them (component-level gate in `MizoScreen`; the route has no server data to protect). Signed-in users of every supported age (15–17 included) get a welcome state, four suggested prompts (fill the composer), message bubbles, composer with + (explains photos come in M3; nothing uploaded) and Send, which stays disabled with an honest "Mizo isn't connected yet" note. Offline, error and daily-limit notice components exist (limit notice unused until M2). History is stored only on this device in a separate IndexedDB database `mizano-mizo` (store `conversations`, key = Supabase user id); `track-meals-macros`, its version and `tmm:*` keys are untouched. The workspace is keyed by account id, so switching accounts never shows another account's chat. "Delete chat" asks for confirmation and removes only that account's chat. No chat sync to Supabase. Files: `src/lib/mizo/chat-store.ts`, `src/components/mizo/mizo-screen.tsx`, `src/components/mizo/mizo-workspace.tsx`, `src/lib/i18n/en-extra.ts`, `src/lib/i18n/ar-extra.ts`, `src/test/mizano/mizo.test.tsx`. Tests: 163 passed (4 new Mizo tests); typecheck and production build passed. Preview: a fresh browser lands on onboarding, and no signed-in session can be created for the external Supabase project from the sandbox, so the Mizo screens were not checked visually (Unverified on phone/tablet/desktop, RTL and both themes).
+- **M2 — Agreed/not started.** Real text answers through a server-side provider (keys never in the app), minimal consented context, server-enforced per-account quotas and rate limits, model/provider routing, safe error handling.
+- **M3 — Agreed/not started.** Vision: attach food photos, clearly approximate nutrition estimates, clarifying questions when ingredients or portion can't be inferred.
+- **M4 — Agreed/not started.** Nutrition actions: parse meal descriptions, ask about variants/portion/ingredients, prepare a reviewable food card and log only after explicit confirmation; custom food estimates marked with provenance and uncertainty.
+- **M5 — Agreed/not started.** Read-only history questions and summaries from actual logged records, respecting Day Start.
+- **M6 — Agreed/not started.** Controlled app actions (for example creating tasks) only after confirmation, and only if a task feature exists.
+- **Future scope, not implemented:** per-account usage limits, premium tiers / model effort, admin-granted complimentary premium, APK distribution compatibility.
+
 ## 9. Notifications and reminders
 
 Deferred feature; design carefully and keep it optional, gentle, and user-controlled.

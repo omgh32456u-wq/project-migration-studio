@@ -10,12 +10,14 @@ import {
   estimateMaintenance,
   GRAMS_PER_OZ,
   macroGramTargets,
+  minTargetKcal,
   parseLocaleNumber,
   perServingToPer100g,
   recipeTotals,
   rescaleItem,
   scaleNutrients,
   sumItems,
+  targetEligibility,
   validateAmount,
   validateTargets,
 } from '@/lib/nutrition'
@@ -125,22 +127,32 @@ describe('recipes', () => {
 })
 
 describe('targets and safeguards', () => {
-  it('never estimates for minors', () => {
-    expect(estimateMaintenance({ ...adult, ageGroup: 'under18', age: 15 })).toEqual({ ok: false, reason: 'minor' })
-    expect(estimateMaintenance({ ...adult, age: 16 })).toEqual({ ok: false, reason: 'minor' })
+  const teenBoy: Profile = { ...adult, ageGroup: 'under18', age: 16, sex: 'male', heightCm: 175, weightKg: 70, activity: 'moderate' }
+  const teenGirl: Profile = { ...adult, ageGroup: 'under18', age: 15, sex: 'female', heightCm: 162, weightKg: 55, activity: 'light' }
+
+  it('estimates ages 15–17 with the IOM adolescent EER, not the adult equation', () => {
+    // Boy: 88.5 − 61.9×16 + 1.13×(26.7×70 + 903×1.75) + 25 = 3020.75 (moderate → "low active" PA 1.13)
+    expect(estimateMaintenance(teenBoy)).toEqual({ ok: true, method: 'teen_eer', bmr: null, maintenance: 3020 })
+    // Girl: 135.3 − 30.8×15 + 1.0×(10×55 + 934×1.62) + 25 = 1761.38 (light → "sedentary" PA 1.0)
+    expect(estimateMaintenance(teenGirl)).toEqual({ ok: true, method: 'teen_eer', bmr: null, maintenance: 1760 })
   })
-  it('requires confirmed adult age group', () => {
+  it('uses the adult equation from age 18', () => {
+    const r = estimateMaintenance({ ...teenBoy, ageGroup: 'adult', age: 18 })
+    expect(r.ok && r.method).toBe('adult_mifflin')
+  })
+  it('requires a known age', () => {
     expect(estimateMaintenance({ ...adult, ageGroup: 'unspecified' })).toEqual({ ok: false, reason: 'age_unknown' })
   })
   it('requires complete data', () => {
     expect(estimateMaintenance({ ...adult, sex: 'unspecified' })).toEqual({ ok: false, reason: 'missing_data' })
+    expect(estimateMaintenance({ ...teenBoy, weightKg: null })).toEqual({ ok: false, reason: 'missing_data' })
   })
   it('estimates maintenance with Mifflin–St Jeor', () => {
     const r = estimateMaintenance(adult)
     expect(r.ok).toBe(true)
     if (r.ok) {
       expect(r.bmr).toBe(Math.round(10 * 60 + 6.25 * 165 - 5 * 30 - 161))
-      expect(r.maintenance).toBe(Math.round((r.bmr * 1.375) / 10) * 10)
+      expect(r.maintenance).toBe(Math.round((r.bmr! * 1.375) / 10) * 10)
     }
   })
   it('keeps macro grams consistent with energy', () => {
@@ -153,10 +165,23 @@ describe('targets and safeguards', () => {
     expect(validateTargets({ kcal: 2000, proteinPct: 20, carbsPct: 50, fatPct: 20 })).toBe('pct_sum')
     expect(validateTargets({ kcal: 2000, proteinPct: 2, carbsPct: 68, fatPct: 30 })).toBe('pct_range')
   })
-  it('disables active targets for minors even if enabled', () => {
-    const t = { enabled: true, kcal: 2000, proteinPct: 20, carbsPct: 50, fatPct: 30 }
-    expect(activeTargets(adult, t)).not.toBeNull()
-    expect(activeTargets({ ...adult, ageGroup: 'under18' }, t)).toBeNull()
+  it('lets ages 15–17 use targets once their details allow an estimate', () => {
+    expect(targetEligibility(teenBoy)).toEqual({ ok: true })
+    expect(targetEligibility({ ...teenBoy, activity: null })).toEqual({ ok: false, reason: 'teen_details' })
+    expect(targetEligibility({ ...adult, ageGroup: 'unspecified' })).toEqual({ ok: false, reason: 'age_unknown' })
+  })
+  it('never offers ages 15–17 a target below their estimated needs', () => {
+    expect(minTargetKcal(teenGirl)).toBe(1760)
+    expect(validateTargets({ kcal: 1500, proteinPct: 20, carbsPct: 50, fatPct: 30 }, minTargetKcal(teenGirl))).toBe('teen_floor')
+    expect(validateTargets({ kcal: 1800, proteinPct: 20, carbsPct: 50, fatPct: 30 }, minTargetKcal(teenGirl))).toBeNull()
+    // A saved target that later falls below needs (e.g. after a growth update) is raised, never kept as a deficit.
+    const t = { enabled: true, kcal: 1800, proteinPct: 20, carbsPct: 50, fatPct: 30 }
+    expect(activeTargets({ ...teenGirl, weightKg: 70, heightCm: 170 }, t)?.kcal).toBe(minTargetKcal({ ...teenGirl, weightKg: 70, heightCm: 170 }))
+  })
+  it('keeps the general floor for adults', () => {
+    expect(minTargetKcal(adult)).toBe(1200)
+    const t = { enabled: true, kcal: 1500, proteinPct: 20, carbsPct: 50, fatPct: 30 }
+    expect(activeTargets(adult, t)?.kcal).toBe(1500)
   })
 })
 

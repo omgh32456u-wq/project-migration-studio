@@ -101,7 +101,7 @@ Requirements:
 - Gender choices should have distinct, tasteful states that are not simply the app's dominant green.
 - Activity-level choices may use progressively rising bar indicators, with clear labels and differentiated but coordinated colors.
 - Separate Day Start visually from activity choices; reduce crowding.
-- Preserve the agreed age and profile constraints already implemented only after inspecting current code and confirming they remain correct. Under-18 handling must be safe and age-appropriate.
+- Ages 15–17 are fully allowed (registration, Mizo, every feature). Age is never a defect or a block; the amber 15–17 cue is informational only. Ages 15–17 get the IOM (2005) adolescent EER estimate, not the adult Mifflin–St Jeor equation; adult reference ranges apply from 18. For 15–17 the energy target can never be set below the estimated needs (no deficit/weight-loss target). Settings lets 15–17 edit age, sex, activity, height and weight. — Implemented 2026-11-14 (see change log).
 - Do not add redundant loading steps for a new local user.
 - Remove duplicate privacy reassurance copy where it appears redundantly.
 - Google/email buttons may show proper recognizable iconography, but do not imply authentication works while it is not connected.
@@ -178,6 +178,8 @@ Agreed initial UI:
 - Clearly communicate that full assistant capability is coming later; no fake generated answers.
 - Reuse the shared M loading mark for future response loading.
 
+Status 2026-11-14: Mizo destination added (route `/mizo`, centre of the 5-item bottom bar, same order in the desktop sidebar). Guests see a sign-up / sign-in prompt; signed-in users of any age see an honest "coming later" empty state. The chat composer and maintenance reply above are not built yet (still Agreed/not started). Implemented / verified in browser preview for guests only — no signed-in session is possible yet (see section 12).
+
 ## 9. Notifications and reminders
 
 Deferred feature; design carefully and keep it optional, gentle, and user-controlled.
@@ -232,6 +234,13 @@ Requirements:
 - Any future account system must define secure local-to-account migration, conflict resolution, backup, deletion, and recovery.
 - Do not enable Supabase or another backend without explicit approval of architecture, costs, and data handling.
 - Maintain local use/guest experience where feasible.
+
+Status 2026-11-14 — account UI implemented, sign-in service **Blocked** (no backend connected; enabling one needs the user's explicit approval):
+- Onboarding Auth step and the account window (avatar on Today/Settings, desktop sidebar) show, in order: Google, Apple (disabled, "Coming later"), Email, Phone number (disabled, "Coming later"), then the Sign up / Sign in switch and Continue as guest. Sign up and Sign in are separate views; sign-in never creates an account. The unknown-account message is privacy-safe ("Email or password don't match an account…") instead of "No account found", to avoid revealing which emails are registered.
+- With no service connected, Google and email show "Accounts aren't switched on in this version yet" and nothing pretends to sign in. All of it runs through one replaceable `AuthClient` (`src/lib/account.ts`).
+- Profile: display name + photo saved on this device in Settings (`settings.account`, included in backups); photo is cropped/downsized locally. "What should we call you?" dialog after a first sign-up, prefilled from the Google first name. Cloud photo sync: not built (needs approved storage).
+- Guest data migration to an account: **not built**. Needs approved decisions first: cloud schema, merge rule per store (foods, logs, recipes, saved meals, weights, settings), and conflict policy. Guest data is never touched.
+- Google strict sign-in vs sign-up cannot be enforced client-side: OAuth may create an account on first use; to be decided when the provider is configured.
 
 ## 13. Themes, icons, support funding, and monetization
 
@@ -331,6 +340,8 @@ Record anything not tested explicitly as **unverified**.
 
 - **2026-11-13:** Brand/logo correction (consolidated task) — Implemented / verified in browser preview only. Replaces the Task 6 whole-plane turn with the separate-halves animation described in section 6, and makes the loading message visible and localized. Files: `src/components/common/brand-mark.tsx`, `src/components/common/loading-mark.tsx`, `src/components/shell/app-shell.tsx`, `src/styles.css`, `src/lib/i18n/ar.ts` (AR text now “تحميل بياناتك…”), `src/test/mizano/loading-mark.test.tsx`. Brand audit: every in-app placement (onboarding header, Welcome, desktop onboarding side panel, onboarding intro, sidebar, Today header) uses the standalone M (`BrandMark` mark); the square tile is used only by favicon/PWA/Apple/Android icon files (`public/`) and is not rendered anywhere in the app UI (checked in the page at 390x844, 800x1280 and 1280x800, EN/AR, Light/Dark); no transform/mirroring in RTL. No plant/leaf branding remains in the source (search clean; the generic food icons are unrelated). Evidence: 89/89 tests; build OK; lint shows only the project-wide prettier quote/semicolon formatting errors, with no other rule problems in the changed files. Playwright with the data store held in loading: 390x844 EN/AR × Light/Dark, 360x640 AR Dark, 800x1280 EN Light and AR Dark, 1280x800 EN Dark and AR Light. In each: message visible and localized, directly below the mark, both centred, no scroll, no square tile, no console errors. Frames sampled across the loop at 390x844 AR Light/Dark, 800x1280 AR Dark and 1280x800 EN Dark/AR Light show the halves trading places while joined at the top. Reduced motion (390x844 EN Dark, 1280x800 AR Light): static M, no animation. Not checked: real Android phone/tablet (smoothness, battery, screen reader), and the onboarding intro help panel (not changed).
 
+- **2026-11-14:** Account / profile / age policy / Mizo access — Implemented / partly verified in browser preview. Decisions: ages 15–17 allowed everywhere (old under-18 account block removed); teen estimates use IOM 2005 adolescent EER (+25 kcal growth); 15–17 energy targets floored at estimated needs; privacy-safe sign-in error instead of "No account found". Files: `src/lib/nutrition.ts`, `src/lib/account.ts`, `src/lib/avatar.ts`, `src/lib/types.ts`, `src/lib/defaults.ts`, i18n EN/AR, `src/components/account/*`, `src/components/mizo/mizo-screen.tsx`, `src/routes/mizo.tsx`, onboarding Auth step, Settings profile/targets, Today header, app shell nav, `public/sw.js` (v6, caches `/mizo`); removed `src/lib/account-eligibility.ts`. Evidence: 103/103 tests (new `account.test.ts`, `account-ui.test.tsx`, teen tests in `core.test.ts`), typecheck clean, build OK, lint only the project-wide prettier formatting. Playwright: Auth step no-scroll at 360x640, 390x844, 740x360, 844x390, 800x1280, 1024x768, 1280x800 × EN/AR × Light/Dark (options and email views); guest flow → Today avatar → account window → Mizo prompt at 360x740 EN Light, 390x844 AR Dark, 820x1180 AR Light, 1280x800 EN Dark, no console errors; 16-year-old in Settings: fields editable, estimate 3,020 kcal, 1,500 kcal refused. Unverified: any real sign-in (no service), signed-in Mizo/profile editor in the browser (tests only), real devices.
+
 Append future decisions here with date, decision, reason, affected requirements, and whether it replaces an earlier decision.
 
 ## 18. Open verification items (do not assume complete)
@@ -341,10 +352,11 @@ Append future decisions here with date, decision, reason, affected requirements,
 - Confirm plant assets/references have been fully removed. — Done 2026-11-13 (code search clean; re-checked in the brand/logo correction).
 - Confirm loading animation matches the agreed partial-M concept (not just a static full logo). — Reworked 2026-11-13 to separate halves trading places around the shared joint, with a visible localized message; browser preview checked (Light/Dark, EN/AR, phone/tablet/desktop, reduced motion). The user's visual sign-off and real-device smoothness are still open.
 - Confirm Day Start persistence and late-night logging behavior. — Logic covered by tests; UI checked in browser preview 2026-11-13 (onboarding + Settings, EN/AR). Real-device late-night use still open.
-- Confirm Add Food and Idea Wheel modal positioning from all entry points and viewport sizes.
+- Confirm Add Food and Idea Wheel modal positioning from all entry points and viewport sizes. — 2026-11-14 finding: at 1280x800 the Add food panel opens half off-screen to the left (pre-existing; not changed in the account task).
 - Confirm Today macro card contrast in both themes.
 - Confirm date navigation ordering in English and Arabic.
-- Confirm Mizo navigation and honest placeholder behavior.
+- Confirm Mizo navigation and honest placeholder behavior. — Navigation + guest prompt checked in browser preview 2026-11-14; chat placeholder not built; signed-in view covered by tests only.
+- Confirm real sign-in, guest-to-account migration and cloud photo sync. — Blocked: no sign-in service connected; migration rules need approval.
 - Confirm support icon is Settings-only and email is correct.
 - Confirm any claimed test count and list exactly which tests ran.
 

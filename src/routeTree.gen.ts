@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as FoodsRouteImport } from './routes/foods'
+import { Route as MizoRouteImport } from './routes/mizo'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as SettingsRouteImport } from './routes/settings'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const FoodsRoute = FoodsRouteImport.update({
   id: '/foods',
   path: '/foods',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MizoRoute = MizoRouteImport.update({
+  id: '/mizo',
+  path: '/mizo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgressRoute = ProgressRouteImport.update({
@@ -38,12 +44,14 @@ const SettingsRoute = SettingsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/foods': typeof FoodsRoute
+  '/mizo': typeof MizoRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/foods': typeof FoodsRoute
+  '/mizo': typeof MizoRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/foods': typeof FoodsRoute
+  '/mizo': typeof MizoRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/foods' | '/progress' | '/settings'
+  fullPaths: '/' | '/foods' | '/mizo' | '/progress' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/foods' | '/progress' | '/settings'
-  id: '__root__' | '/' | '/foods' | '/progress' | '/settings'
+  to: '/' | '/foods' | '/mizo' | '/progress' | '/settings'
+  id: '__root__' | '/' | '/foods' | '/mizo' | '/progress' | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   FoodsRoute: typeof FoodsRoute
+  MizoRoute: typeof MizoRoute
   ProgressRoute: typeof ProgressRoute
   SettingsRoute: typeof SettingsRoute
 }
@@ -83,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/foods'
       fullPath: '/foods'
       preLoaderRoute: typeof FoodsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mizo': {
+      id: '/mizo'
+      path: '/mizo'
+      fullPath: '/mizo'
+      preLoaderRoute: typeof MizoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/progress': {
@@ -105,6 +122,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   FoodsRoute: FoodsRoute,
+  MizoRoute: MizoRoute,
   ProgressRoute: ProgressRoute,
   SettingsRoute: SettingsRoute,
 }

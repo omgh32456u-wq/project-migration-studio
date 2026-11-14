@@ -234,7 +234,7 @@ export function validateFoodValues(per100g: Nutrients): 'negative' | 'exceeds_10
   return null
 }
 
-// ---------- Targets & estimates (adults only) ----------
+// ---------- Targets & estimates ----------
 
 export const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
   sedentary: 1.2,
@@ -244,37 +244,102 @@ export const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
   very_active: 1.9,
 }
 
-export type TargetEligibility = { ok: true } | { ok: false; reason: 'minor' | 'age_unknown' }
+/** Youngest age the app accepts; ages from here up to ADULT_AGE - 1 use the adolescent equations. */
+export const MIN_AGE = 15
+/** Adult equations and adult reference ranges apply from this age. */
+export const ADULT_AGE = 18
 
-export function targetEligibility(profile: Profile): TargetEligibility {
-  if (profile.ageGroup === 'under18') return { ok: false, reason: 'minor' }
-  if (profile.age !== null && profile.age < 18) return { ok: false, reason: 'minor' }
-  if (profile.ageGroup !== 'adult') return { ok: false, reason: 'age_unknown' }
-  return { ok: true }
+/** Ages 15–17 (or the under-18 group). Informational only — never an access rule. */
+export function isTeen(profile: Pick<Profile, 'ageGroup' | 'age'>): boolean {
+  if (profile.age !== null) return profile.age < ADULT_AGE
+  return profile.ageGroup === 'under18'
+}
+
+/**
+ * IOM physical-activity categories used by the adolescent EER equations, picked from the PAL value
+ * of the app's own activity factor (IOM ranges: sedentary 1.0–<1.4, low active 1.4–<1.6,
+ * active 1.6–<1.9, very active 1.9–<2.5).
+ */
+export type IomActivity = 'sedentary' | 'low_active' | 'active' | 'very_active'
+export function iomActivity(level: ActivityLevel): IomActivity {
+  const pal = ACTIVITY_FACTORS[level]
+  if (pal < 1.4) return 'sedentary'
+  if (pal < 1.6) return 'low_active'
+  if (pal < 1.9) return 'active'
+  return 'very_active'
+}
+
+/** IOM (2005) PA coefficients for ages 9–18. */
+const EER_PA: Record<'male' | 'female', Record<IomActivity, number>> = {
+  male: { sedentary: 1.0, low_active: 1.13, active: 1.26, very_active: 1.42 },
+  female: { sedentary: 1.0, low_active: 1.16, active: 1.31, very_active: 1.56 },
+}
+
+/**
+ * Estimated Energy Requirement for adolescents, from the Institute of Medicine Dietary Reference
+ * Intakes for Energy, Carbohydrate, Fiber, Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids
+ * (National Academies Press, 2005), equations for ages 9–18, which include +25 kcal/day for growth:
+ *   boys:  88.5 − 61.9 × age + PA × (26.7 × kg + 903 × m) + 25
+ *   girls: 135.3 − 30.8 × age + PA × (10.0 × kg + 934 × m) + 25
+ * It is a population estimate of energy to maintain healthy growth, not a clinical prescription.
+ */
+export function adolescentEER(sex: 'male' | 'female', age: number, heightCm: number, weightKg: number, activity: ActivityLevel): number {
+  const pa = EER_PA[sex][iomActivity(activity)]
+  const m = heightCm / 100
+  return sex === 'male'
+    ? 88.5 - 61.9 * age + pa * (26.7 * weightKg + 903 * m) + 25
+    : 135.3 - 30.8 * age + pa * (10.0 * weightKg + 934 * m) + 25
 }
 
 export type EstimateResult =
-  | { ok: true; bmr: number; maintenance: number }
-  | { ok: false; reason: 'minor' | 'age_unknown' | 'missing_data' }
+  | { ok: true; method: 'adult_mifflin' | 'teen_eer'; bmr: number | null; maintenance: number }
+  | { ok: false; reason: 'age_unknown' | 'missing_data' }
 
-/** Mifflin–St Jeor resting energy × activity factor. Maintenance estimate only — no deficit is applied. */
+/**
+ * Maintenance energy only — no deficit is ever applied.
+ * 18+: Mifflin–St Jeor resting energy × activity factor. 15–17: IOM adolescent EER (see adolescentEER).
+ */
 export function estimateMaintenance(profile: Profile): EstimateResult {
-  const elig = targetEligibility(profile)
-  if (!elig.ok) return elig
   const { age, sex, heightCm, weightKg, activity } = profile
-  if (age === null || age < 18 || age > 100 || heightCm === null || weightKg === null || !activity || sex === 'unspecified') {
+  if (profile.ageGroup === 'unspecified') return { ok: false, reason: 'age_unknown' }
+  if (age === null || age < MIN_AGE || age > 100 || heightCm === null || weightKg === null || !activity || sex === 'unspecified') {
     return { ok: false, reason: 'missing_data' }
+  }
+  if (age < ADULT_AGE) {
+    const eer = adolescentEER(sex, age, heightCm, weightKg, activity)
+    return { ok: true, method: 'teen_eer', bmr: null, maintenance: Math.round(eer / 10) * 10 }
   }
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age
   const bmr = sex === 'male' ? base + 5 : base - 161
   const maintenance = bmr * ACTIVITY_FACTORS[activity]
-  return { ok: true, bmr: Math.round(bmr), maintenance: Math.round(maintenance / 10) * 10 }
+  return { ok: true, method: 'adult_mifflin', bmr: Math.round(bmr), maintenance: Math.round(maintenance / 10) * 10 }
 }
 
-export type TargetError = 'kcal_range' | 'pct_range' | 'pct_sum'
+/**
+ * Optional personal targets. Every age may log food and see totals; this only decides whether the
+ * target form can be used. Ages 15–17 need a complete profile so the age-appropriate estimate can act
+ * as the floor (no calorie-deficit targets below estimated needs for teens).
+ */
+export type TargetEligibility = { ok: true } | { ok: false; reason: 'age_unknown' | 'teen_details' }
 
-export function validateTargets(t: Pick<Targets, 'kcal' | 'proteinPct' | 'carbsPct' | 'fatPct'>): TargetError | null {
+export function targetEligibility(profile: Profile): TargetEligibility {
+  if (profile.ageGroup === 'unspecified') return { ok: false, reason: 'age_unknown' }
+  if (isTeen(profile) && !estimateMaintenance(profile).ok) return { ok: false, reason: 'teen_details' }
+  return { ok: true }
+}
+
+/** Lowest kcal target allowed: the estimated maintenance for ages 15–17, the general limit otherwise. */
+export function minTargetKcal(profile: Profile): number {
+  if (!isTeen(profile)) return TARGET_LIMITS.minKcal
+  const e = estimateMaintenance(profile)
+  return e.ok ? Math.max(TARGET_LIMITS.minKcal, Math.min(TARGET_LIMITS.maxKcal, e.maintenance)) : TARGET_LIMITS.minKcal
+}
+
+export type TargetError = 'kcal_range' | 'teen_floor' | 'pct_range' | 'pct_sum'
+
+export function validateTargets(t: Pick<Targets, 'kcal' | 'proteinPct' | 'carbsPct' | 'fatPct'>, minKcal: number = TARGET_LIMITS.minKcal): TargetError | null {
   if (t.kcal === null || t.kcal < TARGET_LIMITS.minKcal || t.kcal > TARGET_LIMITS.maxKcal) return 'kcal_range'
+  if (t.kcal < minKcal) return 'teen_floor'
   for (const p of [t.proteinPct, t.carbsPct, t.fatPct]) {
     if (!Number.isFinite(p) || p < MACRO_PCT_LIMITS.min || p > MACRO_PCT_LIMITS.max) return 'pct_range'
   }
@@ -292,13 +357,18 @@ export function macroGramTargets(t: Pick<Targets, 'kcal' | 'proteinPct' | 'carbs
   }
 }
 
-/** Active targets only when enabled, valid and the profile is eligible. */
+/**
+ * Active targets only when enabled, valid and the profile is eligible. For ages 15–17 the kcal target
+ * never sits below the current estimated needs (it follows growth/profile updates upward).
+ */
 export function activeTargets(profile: Profile, targets: Targets): { kcal: number; grams: Record<MacroKey, number> } | null {
   if (!targets.enabled || !targetEligibility(profile).ok) return null
   if (validateTargets(targets)) return null
-  const grams = macroGramTargets(targets)
-  if (!grams || targets.kcal === null) return null
-  return { kcal: targets.kcal, grams }
+  if (targets.kcal === null) return null
+  const kcal = Math.max(targets.kcal, minTargetKcal(profile))
+  const grams = macroGramTargets({ ...targets, kcal })
+  if (!grams) return null
+  return { kcal, grams }
 }
 
 // ---------- Units ----------

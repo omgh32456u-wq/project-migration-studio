@@ -130,6 +130,11 @@
   --color-minor-fill: var(--minor-fill);
   --color-minor-fill-foreground: var(--minor-fill-foreground);
   --color-brand-lime: var(--brand-lime);
+  --color-provider: var(--provider);
+  --color-provider-border: var(--provider-border);
+  --color-provider-foreground: var(--provider-foreground);
+  --color-apple: var(--apple);
+  --color-apple-foreground: var(--apple-foreground);
   --color-brand-lime-foreground: var(--brand-lime-foreground);
   --color-warning-foreground: var(--warning-foreground);
   --color-chart-5: var(--chart-5);
@@ -314,6 +319,13 @@
   /* Lime from the logo's second stroke. */
   --brand-lime: #c3e828;
   --brand-lime-foreground: #1f2a10;
+  /* Sign-in provider buttons: Google's light theme surface (also used for email/phone so all match). */
+  --provider: #ffffff;
+  --provider-border: #747775;
+  --provider-foreground: #1f1f1f;
+  /* Sign in with Apple: "white with outline" on light backgrounds. */
+  --apple: #ffffff;
+  --apple-foreground: #000000;
   /* Outline M (loading): --mark-a = the logo's white arch, --mark-b = lime arch, --mark-b-edge = its casing,
      --mark-fill = the surface the mark sits on (hides the half behind; override on non-background surfaces). */
   --mark-fill: var(--background);
@@ -377,6 +389,12 @@
   --minor-fill-foreground: oklch(0.22 0.05 60);
   --brand-lime: #c3e828;
   --brand-lime-foreground: #1f2a10;
+  /* Google dark theme surface; Apple "white" style on dark backgrounds. */
+  --provider: #131314;
+  --provider-border: #8e918f;
+  --provider-foreground: #e3e3e3;
+  --apple: #ffffff;
+  --apple-foreground: #000000;
   --mark-a: #eaf0ec;
   --mark-b: #c3e828;
   --mark-b-edge: transparent;

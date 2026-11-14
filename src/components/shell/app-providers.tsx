@@ -1,5 +1,6 @@
 
 import type { ReactNode } from 'react'
+import { AccountProvider } from '@/components/account/account-provider'
 import { AppStoreProvider, useStore } from '@/components/providers/app-store'
 import { ToastProvider } from '@/components/providers/toast-provider'
 import { AppShell } from './app-shell'
@@ -19,7 +20,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <AppStoreProvider>
       <WithToasts>
-        <AppShell>{children}</AppShell>
+        <AccountProvider>
+          <AppShell>{children}</AppShell>
+        </AccountProvider>
         <PwaRegister />
         <ReminderRunner />
       </WithToasts>

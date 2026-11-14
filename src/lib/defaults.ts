@@ -1,5 +1,5 @@
 import { DEFAULT_DAY_START_MINUTES, normalizeDayStart } from './nutrition-day'
-import type { Settings } from './types'
+import type { AccountProfile, Settings } from './types'
 
 export function createId(prefix = ''): string {
   const uuid =
@@ -34,6 +34,21 @@ export function defaultSettings(): Settings {
     mealNames: {},
     favorites: [],
     dayStartMinutes: DEFAULT_DAY_START_MINUTES,
+    account: { userId: null, displayName: '', avatar: null },
+  }
+}
+
+export const MAX_DISPLAY_NAME = 40
+/** ~300 KB of base64 is far above a 256 px JPEG; anything larger is not one of ours. */
+export const MAX_AVATAR_CHARS = 400_000
+
+export function normalizeAccountProfile(raw: unknown): AccountProfile {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<Record<keyof AccountProfile, unknown>>
+  const avatar = typeof r.avatar === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(r.avatar) && r.avatar.length <= MAX_AVATAR_CHARS ? r.avatar : null
+  return {
+    userId: typeof r.userId === 'string' && r.userId ? r.userId : null,
+    displayName: typeof r.displayName === 'string' ? r.displayName.trim().slice(0, MAX_DISPLAY_NAME) : '',
+    avatar,
   }
 }
 
@@ -50,6 +65,8 @@ export function normalizeSettings(raw: Partial<Settings> | undefined): Settings 
     favorites: Array.isArray(raw.favorites) ? raw.favorites.filter((x) => typeof x === 'string') : [],
     // Settings saved before this field existed (and any invalid value) keep the midnight day boundary.
     dayStartMinutes: normalizeDayStart(raw.dayStartMinutes),
+    // Settings saved before accounts existed get an empty profile; bad values are dropped, never thrown.
+    account: normalizeAccountProfile(raw.account),
   }
 }
 

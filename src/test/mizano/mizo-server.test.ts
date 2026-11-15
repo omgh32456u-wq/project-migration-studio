@@ -277,7 +277,7 @@ describe('Mizo endpoint: context window and persona', () => {
     const en = mizoSystemPrompt('en')
     const ar = mizoSystemPrompt('ar')
     expect(ar).toContain('Egyptian Arabic')
-    expect(en).toContain('Reply in clear, friendly English')
+    expect(en).toContain('Reply in clear, natural English')
     for (const p of [en, ar]) {
       expect(p).toMatch(/Never invent exact nutrition numbers/)
       expect(p).toMatch(/Don't diagnose/)
@@ -288,5 +288,7 @@ describe('Mizo endpoint: context window and persona', () => {
       expect(p).toContain('Do not force jokes')
       expect(p).toContain('Chat is for natural conversation')
     }
+    expect(ar).toContain('اللهجة المصرية')
+    expect(ar).toContain('كنت بتصيع فين من ورايا')
   })
 })

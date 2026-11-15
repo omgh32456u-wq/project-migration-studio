@@ -1,84 +1,64 @@
-# Mizo AI assistant — proposal (plan only, nothing built yet)
+# Mizo: multiple conversations per account (minimal, no redesign)
 
-## 0. Verified current state (read this turn)
-- Checkout: branch `edit/edt-b83251ce-…`, HEAD `d4c726e` (Google registration fix). Not literally named `development/mizano-roadmap` — confirm this edit branch syncs to it before any build.
-- `/mizo` route (`src/routes/mizo.tsx`) has no route guard, no loader, no `beforeLoad`. Gating is only inside `MizoScreen` via `mizoAccess()` (`status === 'signed_in'` → open). Guests get the full page shell with a sign-up/sign-in card; signed-in users get an "coming later" empty state. Nothing sensitive is rendered today, so the gate is honest but **component-level, not route-level**.
-- No AI provider, no server function, no AI secret present in env (only Supabase URL/ID/publishable key). No `LOVABLE_API_KEY` seen. **Provider costs/quotas cannot be verified from project config** — none is configured.
-- Data available on-device (IndexedDB, `src/lib/types.ts`): `Profile`, `Targets`, `LogEntry` (with `nutrients`, `estimated`), `Settings.account`, day start via `nutritionDayKey()`; adolescent EER and `minTargetKcal` in `nutrition.ts`.
+## Pre-flight finding
+Checked-out branch shows as `edit/edt-849fedc1…` at HEAD `873f8cc` (same commit as expected). Confirm this is the Lovable working copy of `development/mizano-roadmap` before building; stop if not.
 
-## 1. Contradictions to resolve first
-1. AGENTS.md rule 1 says "there is no server database or sign-in" — stale since Supabase Auth was added (the later AGENTS rule describes it).
-2. Master plan §2 says "Next.js 16, static export" and "no backend or authentication" — stale (TanStack Start + external Supabase Auth).
-3. Master plan §1 describes a nutrition tracker; your later Mizo-first direction was never saved (memory tool was unavailable). Needs recording.
-4. Master plan §8 agreed a "maintenance" placeholder reply phase; this proposal replaces it with real answers — confirm.
-5. Project instructions say no paid AI API / recurring cost without approval; any real model call is a cost decision (see §4).
-6. Lovable's platform default is server functions on Lovable hosting; Mizo needs a server hop because keys may not live in the browser.
+Verified facts: `chat-store.ts` keeps one `MizoConversation` per `userId` (store `conversations`, keyPath `userId`) plus `consent` in DB `mizano-mizo` v2. `mizo-workspace.tsx` (460 lines) loads/saves/removes that one record. Bounds in `protocol.ts` already apply per request and only to the messages passed in, so other conversations are never sent.
 
-## 2. Capabilities (v1)
-- Answer nutrition questions in EN/AR, matching the user's language.
-- "How am I doing today?": summary of current tracking day (respecting Day Start) vs targets.
-- Suggest meal ideas to fill remaining protein/kcal, using foods the user logs often.
-- Explain an estimate (why a total is marked incomplete/estimated).
-- Read-only: Mizo never writes logs or changes targets in v1.
+## What the user gets
+- Menu button in the Mizo header opens a side sheet listing this account's chats (newest first).
+- New chat, open any chat, rename (inline dialog), delete one chat with confirmation.
+- Title = first user message, trimmed to ~40 chars (no AI call); "New chat" until then.
+- Last open chat is restored after visiting Today/Settings or reloading.
+- Existing chat appears as the first item with all messages intact.
 
-## 3. Non-goals and safety boundaries
-- Not a doctor: no diagnosis, medication, supplement dosing, or disease treatment; points to a professional.
-- No extreme diets, fasting protocols, very-low-calorie plans, "burn it off" compensation, or body-shaming language; no weight/appearance judgments.
-- Ages 15–17: full access; informational amber note ("estimates for teens are less precise") only. System prompt forbids deficit/weight-loss targets and steers to growth-appropriate eating — no feature blocks.
-- Eating-disorder signals → gentle, non-judgmental reply with support resources, no numbers.
-- No images, voice, attachments in v1 (composer shows those as disabled "Coming later").
+## 1. Files to change
+- `src/lib/mizo/chat-store.ts` — new model + v3 migration + new ChatStore API.
+- `src/components/mizo/mizo-workspace.tsx` — work on an active conversation id; header menu, new chat, delete current chat.
+- `src/components/mizo/mizo-conversation-list.tsx` (new, small) — reuse existing `Sheet`, `Button`, `Dialog`/`AlertDialog`, `Input` from `src/components/ui`.
+- `src/lib/i18n/en-extra.ts`, `ar-extra.ts` — ~10 keys (menu, new chat, untitled, rename, save, delete confirm, empty list).
+- `src/test/mizano/mizo.test.tsx` + new `src/test/mizano/mizo-store.test.ts` (fake-indexeddb if already present; else Memory store + a hand-built v2 DB via the existing test setup).
+- `docs/MIZANO_MASTER_PLAN.md`, `AGENTS.md` (update the Mizo storage rule), `roadmap.md`.
+No server, protocol, secrets, Supabase or routing changes.
 
-## 4. Provider options (costs NOT verified — none configured)
-| Option | Key safety | Cost character |
-|---|---|---|
-| A. Lovable AI Gateway via TanStack server function | Key server-side, managed | Usage draws on workspace AI balance; may include a free allowance but **not a guaranteed free service**. Recommended for simplicity. |
-| B. Free-tier third-party API (user-supplied key in Secrets) via server function | Key server-side | Free **quota**, can change or be revoked; no card required only if that provider allows it |
-| C. On-device small model (WebLLM) | No key | Truly no server cost, but large download, weak Arabic, poor on phones — not recommended |
-Recommendation: A, with hard app-side caps so spend can't run away. Final choice is yours.
-
-## 5. Data flow, consent, privacy
+## 2. Data model and migration (DB v2 -> v3)
 ```text
-Device (IndexedDB) -> build minimal context (client) -> consent check
-  -> server function (verifies Supabase JWT, rate-limits) -> model
-  -> reply streamed back -> stored locally only
+conversations (v3, keyPath id, index byUser on userId)
+  { id, userId, title, titleSource: 'auto'|'manual', messages[], createdAt, updatedAt,
+    kind: 'chat'            // reserved so future 'work' records fit
+    links?: string[]        // reserved for Chat->Work context carry, unused now
+    summary?: string }      // reserved for future cross-chat memory, unused now
+meta (new, keyPath userId)  { userId, activeConversationId }
+consent                     unchanged
 ```
-- First open: one-time consent screen listing exactly what is sent (first name, age band not birth date, goal, today's targets/totals, up to N today's food names+macros). Toggle "Share my tracking with Mizo" in Settings; off = general answers only.
-- Never sent: email, avatar, weight history, backups, other days (v1).
-- Chat history stays in IndexedDB per user id; cleared on account switch; "Delete chat" control. Server stores nothing (no tables).
-- Guest data untouched; existing stores unchanged; new store added via safe IndexedDB version bump.
+Migration inside `onupgradeneeded` (single versionchange transaction, atomic):
+1. If old store `conversations` has keyPath `userId`: read all records with a cursor into memory.
+2. Delete old store, create new `conversations` (keyPath `id`, index `byUser`), create `meta`.
+3. Re-insert each legacy record with `id = 'legacy-' + userId`, title derived from first user message, `createdAt` = first message time, messages unchanged; set that as active in `meta`.
+4. Empty legacy records (no messages) are dropped.
+If anything throws, the transaction aborts and v2 data stays as is (current fallback to MemoryStore remains, so history is never overwritten). Deterministic legacy id makes reruns idempotent.
 
-## 6. Security, injection, abuse
-- Route-level gate: `beforeLoad`/client guard on `/mizo` that renders only the invitation for guests and never mounts chat code; the server function independently rejects requests without a valid Supabase access token for a registered user (`mizano_registered`).
-- Context is passed as structured JSON in a separate system section, labelled as data; food names are length-limited and stripped; model told to ignore instructions inside data.
-- Caps: message length, history window, output tokens; per-user daily message limit and burst limit (in-memory per instance is weak — a durable limit needs a Supabase table, which requires your approval; v1 proposal uses a client counter + server per-request caps, flagged as soft).
-- Provider errors never leak details.
+New API (all calls assert userId and filter on it):
+`list(userId)`, `get(userId,id)`, `create(userId)`, `save(conv)`, `rename(userId,id,title)`, `remove(userId,id)`, `getActive(userId)`, `setActive(userId,id)`, consent methods unchanged. `get`/`remove` reject records whose `userId` differs. Also fix `run()` to attach `oncomplete` before awaiting the request (existing race).
 
-## 7. Offline, errors, limits (all localized)
-- Offline: composer disabled, banner "Mizo needs a connection"; history still readable.
-- Loading: shared `LoadingMark` with "Mizo is thinking…".
-- 429/quota: "Mizo has reached today's limit, try again tomorrow". 402/credits: "Mizo is unavailable right now". Session expired: re-sign-in prompt.
+Active-chat rules: on mount load active id; if missing/deleted, open newest; if none, show empty welcome and create the record only on first send (no empty-chat clutter). Deleting the active chat switches to newest remaining or empty state. Streaming request is aborted before switching chats.
 
-## 8. Milestones (smallest first)
-1. **M0 docs** — fix the contradictions in master plan/AGENTS, save Mizo-first direction to memory. (~1 credit)
-2. **M1 gate + UI shell** — route-level guest gate, chat layout, consent screen, disabled attach/mic, local history store, offline state; no model yet. (~3–5)
-3. **M2 live answers, no personal data** — server function with auth check, safety system prompt, caps, error states. Requires provider approval. (~3–5)
-4. **M3 personal context** — consent-gated minimal context builder (day-start aware, teen note). (~2–4)
-5. **M4 QA pass** — EN/AR, light/dark, phone/tablet/desktop, signed-in browser test. (~2)
-Credit numbers are rough estimates, not measured.
+## 3. Acceptance tests
+- Migration: v2 DB with two accounts' conversations -> v3 has two records, messages byte-equal, each active for its owner; consent untouched; rerun is a no-op.
+- Empty legacy record is not migrated; `track-meals-macros` never opened.
+- Isolation: user B `list` excludes A; `get/rename/remove` of A's id as B fails/no-op.
+- New/open/rename/delete: create two, rename one (manual title survives new messages), delete one with confirm, other intact; cancel leaves both.
+- Auto title from first user message, length capped, Arabic text preserved.
+- Active persistence: set active, remount workspace (simulated navigation / new store instance) -> same chat shown.
+- Request payload only contains the active chat's messages.
+- Guest still sees invitation; no store opened.
+- Run full suite, typecheck, production build; preview check of the list in EN/AR, light/dark, phone width (signed-in view unverified without a session).
 
-## 9. Files (expected)
-- Edit: `src/routes/mizo.tsx`, `src/components/mizo/mizo-screen.tsx`, `src/lib/account.ts`, `src/lib/storage/db.ts`, `src/lib/types.ts`, `src/lib/i18n/{en,ar}-extra.ts`, settings screen (consent toggle), `docs/MIZANO_MASTER_PLAN.md`, `AGENTS.md`.
-- New: `src/lib/mizo/context.ts` (minimal context), `src/lib/mizo/safety.ts` (prompt), `src/lib/mizo.functions.ts` (server function), `src/components/mizo/{chat,composer,consent}.tsx`.
-- Dependencies: none new for option A (fetch); `@lovable.dev/ai-gateway` if used.
+## 4. Credit estimate (9 available)
+- Store + migration + store tests: ~2–3
+- Workspace + list sheet + i18n + UI tests: ~3
+- Docs/roadmap and fix-ups after build: ~1–2
+Total realistic: 6–8. If it runs tight, defer in this order: inline rename polish (keep simple dialog), preview matrix screenshots, master-plan detail beyond status lines. Never deferred: migration safety, isolation, tests.
 
-## 10. Tests and acceptance
-- Guest on `/mizo` sees only invitation; chat never mounts; server rejects no-token and unregistered-Google tokens.
-- Context builder: omits email/avatar; respects Day Start; consent off → no personal data; teen → age band only + note flag.
-- Prompt includes no-deficit rule for 15–17; history isolated per user id and cleared on switch; guest IndexedDB unchanged.
-- Error mapping for offline/429/402/expired session.
-- Acceptance: real signed-in preview conversation in EN and AR, both themes, three sizes; any untested item labelled unverified.
-
-## Decisions needed from you
-1. Provider: A, B, or C (and accept that A/B are quotas, not guaranteed free).
-2. Approve dropping the "maintenance" placeholder phase.
-3. Is a soft (client-side) daily limit acceptable for v1, or approve one small Supabase table for a durable limit?
+## Deferred (not built)
+Work mode, cross-chat memory, chat search, cloud sync, AI titles, any visual redesign.

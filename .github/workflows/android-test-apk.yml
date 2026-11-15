@@ -35,13 +35,16 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "22"
+          bun-version: latest
 
-      - name: Install Capacitor Android tooling
-        run: npm install --no-save --package-lock=false @capacitor/cli@^8 @capacitor/android@^8
+      - name: Install project dependencies
+        run: bun install
+
+      - name: Add Capacitor Android tooling
+        run: bun add --dev @capacitor/cli@^8 @capacitor/android@^8
 
       - name: Prepare Capacitor web directory
         run: |
@@ -49,10 +52,10 @@ jobs:
           printf '<!doctype html><html><head><meta charset="utf-8"></head><body>Loading Mizano test build...</body></html>' > dist/index.html
 
       - name: Generate Android project
-        run: npx cap add android
+        run: bunx cap add android
 
       - name: Sync Android project
-        run: npx cap sync android
+        run: bunx cap sync android
 
       - name: Build debug APK
         working-directory: android

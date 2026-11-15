@@ -1,0 +1,67 @@
+name: Android Test APK
+
+on:
+  push:
+    branches:
+      - development/mizano-roadmap
+    paths:
+      - capacitor.config.ts
+      - .github/workflows/android-test-apk.yml
+  workflow_dispatch:
+    inputs:
+      deployment_url:
+        description: "Vercel deployment URL to load in the test app"
+        required: false
+        default: "https://project-migration-studio-rkshdtk3o-ndnskvksjcjjdjdj-5162.vercel.app"
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    name: Build installable debug APK
+    runs-on: ubuntu-latest
+    env:
+      MIZANO_TEST_URL: ${{ github.event.inputs.deployment_url || 'https://project-migration-studio-rkshdtk3o-ndnskvksjcjjdjdj-5162.vercel.app' }}
+    steps:
+      - name: Check out test branch
+        uses: actions/checkout@v4
+        with:
+          ref: development/mizano-roadmap
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Capacitor Android tooling
+        run: npm install --no-save --package-lock=false @capacitor/cli@^8 @capacitor/android@^8
+
+      - name: Prepare Capacitor web directory
+        run: |
+          mkdir -p dist
+          printf '<!doctype html><html><head><meta charset="utf-8"></head><body>Loading Mizano test build...</body></html>' > dist/index.html
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Sync Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mizano-test-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

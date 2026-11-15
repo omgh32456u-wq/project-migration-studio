@@ -125,6 +125,9 @@ describe('Mizo endpoint: consent and configuration', () => {
       expect(res.status).toBe(400)
       expect(fetchImpl).not.toHaveBeenCalled()
     }
+    expect(ar).toContain('اللهجة المصرية')
+    expect(ar).toContain('كنت بتصيع فين من ورايا')
+    expect(en).toContain('Reply in clear, natural English')
   })
 })
 
@@ -278,8 +281,12 @@ describe('Mizo endpoint: context window and persona', () => {
     for (const p of [en, ar]) {
       expect(p).toMatch(/Never invent exact nutrition numbers/)
       expect(p).toMatch(/Don't diagnose/)
-      expect(p).toMatch(/Never suggest skipping meals/)
+      expect(p).toMatch(/Never give minors restrictive weight-loss diets/)
       expect(p).toMatch(/15–17/)
+      expect(p).toContain('Omar Elhady')
+      expect(p).toContain('Build familiarity gradually')
+      expect(p).toContain('Do not force jokes')
+      expect(p).toContain('Chat is for natural conversation')
     }
   })
 })

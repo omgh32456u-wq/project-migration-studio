@@ -9,6 +9,7 @@ on:
       - vite.config.ts
       - .github/workflows/android-test-apk.yml
       - src/lib/mizo/client.ts
+      - src/routes/api/public/mizo/chat.ts
   workflow_dispatch:
 
 permissions:

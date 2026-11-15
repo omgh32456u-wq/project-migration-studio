@@ -145,11 +145,10 @@ The current protocol has draft limits of 200 characters per memory, 5 memories p
 
 The following limited facts were explicitly recoverable and are relevant to supporting the creator's own Mizano work. They should be treated as a proposed owner-context seed, not automatically injected into every response.
 
-- Role: student and developer.
+- Role: Omar Elhady, student and developer.
 - Project: creator/developer of Mizano and designer of Mizo's intended identity and behavior.
 - Working preference: values accurate implementation, careful review, continuity, direct practical communication, and complete treatment of important requirements.
 - Current planning context: balances school responsibilities with software development.
-- Other project interests: Nafas (student-focused system concept) and KingdomForge (medieval strategy game concept).
 
 Rules for this seed:
 - Use only within the creator's own account and only when relevant.

@@ -10,6 +10,7 @@ import {
   type MizoErrorCode,
   type MizoLocale,
   type MizoStreamEvent,
+  type MizoWireMemory,
   type MizoWireMessage,
 } from './protocol'
 
@@ -29,12 +30,17 @@ export type MizoTransport = (input: {
   onDelta: (text: string) => void
 }) => Promise<MizoResult>
 
-/** History up to (and including) the question being answered, as role/content pairs only. */
-export function buildMizoRequest(history: MizoMessage[], locale: MizoLocale): MizoChatRequest {
+/**
+ * History of the open chat up to (and including) the question being answered, as role/content pairs
+ * only, plus the already-selected relevant memories. Other chats are never included.
+ */
+export function buildMizoRequest(history: MizoMessage[], locale: MizoLocale, memories: MizoWireMemory[] = []): MizoChatRequest {
   const messages: MizoWireMessage[] = history
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.text.trim())
     .map((m) => ({ role: m.role, content: m.text.trim().slice(0, 2000) }))
-  return { locale, consentVersion: MIZO_CONSENT_VERSION, messages: boundContext(messages) }
+  const request: MizoChatRequest = { locale, consentVersion: MIZO_CONSENT_VERSION, messages: boundContext(messages) }
+  if (memories.length) request.memories = memories.map((m) => ({ category: m.category, content: m.content }))
+  return request
 }
 
 /** Same-origin on the web. A bundled Android build sets `VITE_MIZO_API_ORIGIN` to the published https origin. */

@@ -3,4 +3,5 @@
 - [x] Mizo M1: chat workspace UI, guest page gate, on-device per-account history with delete, tests, roadmap in master plan.
 - [x] Mizo M2 code: AshnaAI text chat endpoint, consent, streaming, quotas, tests.
 - [ ] Mizo M2 live: blocked on the ASHNA_API_KEY secret being added, then a signed-in check.
+- [x] Mizo multiple conversations: list, new, open, rename, delete one, restore last open chat, safe upgrade of old chat, tests.
 - [ ] Mizo M3–M6: waiting for approval.

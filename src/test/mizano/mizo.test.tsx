@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { createTranslator } from '@/lib/i18n'
 import { defaultSettings } from '@/lib/defaults'
@@ -235,6 +235,35 @@ describe('Mizo conversations', () => {
     renderMizo(signedIn('u1'), s)
     expect(await screen.findByText('newest chat', { selector: 'p' })).toBeInTheDocument()
     await waitFor(async () => expect(await s.getActive('u1')).toBe('b'))
+  })
+
+  it('keeps a new empty chat open across leaving Mizo, without duplicates, and falls back when it is deleted', async () => {
+    const s = new MemoryChatStore()
+    await s.save(conv('u1', 'older chat', 'old'))
+    await s.setActive('u1', 'old')
+    const first = renderMizo(signedIn('u1'), s)
+    expect(await screen.findByText('older chat', { selector: 'p' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    await waitFor(async () => expect(await s.list('u1')).toHaveLength(2))
+    const fresh = (await s.list('u1')).find((c) => c.id !== 'old')!
+    expect(fresh.messages).toEqual([])
+    await waitFor(async () => expect(await s.getActive('u1')).toBe(fresh.id))
+    first.unmount()
+    renderMizo(signedIn('u1'), s)
+    expect(await screen.findByText("Hi, I'm Mizo")).toBeInTheDocument()
+    expect(screen.queryByText('older chat', { selector: 'p' })).toBeNull()
+    // Asking for another new chat while the empty one is open reuses it.
+    fireEvent.click(screen.getByRole('button', { name: 'Your chats' }))
+    await screen.findByRole('heading', { name: 'Your chats' })
+    fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'New chat' })[0])
+    await waitFor(async () => expect(await s.list('u1')).toHaveLength(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Your chats' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete New chat' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await waitFor(async () => expect(await s.get('u1', fresh.id)).toBeNull())
+    expect(await screen.findByText('older chat', { selector: 'p' })).toBeInTheDocument()
+    expect(await s.getActive('u1')).toBe('old')
+    expect(await s.list('u1')).toHaveLength(1)
   })
 
   it('opens, renames and deletes one chat from the list without touching the others or consent', async () => {

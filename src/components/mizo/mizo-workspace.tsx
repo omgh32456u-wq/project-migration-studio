@@ -273,7 +273,7 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
     await answer(message.id)
   }
 
-  /** Opens a chat (or a fresh unsaved one). Any reply still streaming is stopped and kept in its own chat. */
+  /** Opens a saved chat. Any reply still streaming is stopped and kept in its own chat. */
   const openChat = async (next: MizoConversation) => {
     abortRef.current?.abort()
     convRef.current = next
@@ -283,10 +283,20 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
     setDraft('')
     setListOpen(false)
     try {
-      await (await getStore()).setActive(userId, chats.some((c) => c.id === next.id) ? next.id : null)
+      await (await getStore()).setActive(userId, next.id)
     } catch {
       setSaveError(true)
     }
+  }
+
+  /** Saves a new empty chat right away so it stays open across navigation and reloads. An already empty open chat is reused, never duplicated. */
+  const startNewChat = async () => {
+    const current = convRef.current
+    const reuse = current !== null && current.messages.length === 0 && !abortRef.current
+    const next = reuse ? current : newConversation(userId)
+    if (reuse) setListOpen(false)
+    else await openChat(next)
+    if (!chats.some((c) => c.id === next.id)) await persist(next)
   }
 
   const renameChat = async () => {
@@ -345,7 +355,7 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
               <Trash2 aria-hidden />
             </Button>
           )}
-          <Button variant="ghost" size="icon" aria-label={t('mizo.chats.new')} disabled={messages.length === 0 && !busy} onClick={() => void openChat(newConversation(userId))}>
+          <Button variant="ghost" size="icon" aria-label={t('mizo.chats.new')} disabled={messages.length === 0 && !busy} onClick={() => void startNewChat()}>
             <SquarePen aria-hidden />
           </Button>
         </div>
@@ -503,7 +513,7 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
           <SheetHeader className="p-0">
             <SheetTitle>{t('mizo.chats.title')}</SheetTitle>
           </SheetHeader>
-          <Button variant="outline" onClick={() => void openChat(newConversation(userId))}>
+          <Button variant="outline" onClick={() => void startNewChat()}>
             <SquarePen aria-hidden />
             {t('mizo.chats.new')}
           </Button>

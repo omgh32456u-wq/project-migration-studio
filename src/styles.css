@@ -130,6 +130,11 @@
   --color-minor-fill: var(--minor-fill);
   --color-minor-fill-foreground: var(--minor-fill-foreground);
   --color-brand-lime: var(--brand-lime);
+  --color-provider: var(--provider);
+  --color-provider-border: var(--provider-border);
+  --color-provider-foreground: var(--provider-foreground);
+  --color-apple: var(--apple);
+  --color-apple-foreground: var(--apple-foreground);
   --color-brand-lime-foreground: var(--brand-lime-foreground);
   --color-warning-foreground: var(--warning-foreground);
   --color-chart-5: var(--chart-5);
@@ -163,7 +168,7 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  /* Elevation: soft, green-tinted shadows (light) / deeper ambient shadows (dark). */
+  /* Elevation: soft, lightly tinted shadows (light) / deeper ambient shadows (dark). */
   --shadow-soft: var(--elev-soft);
   --shadow-lift: var(--elev-lift);
   --shadow-glow: var(--elev-glow);
@@ -171,6 +176,90 @@
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
   --animate-rise: rise 0.55s var(--ease-soft) both;
   --animate-fade-in: fade-in 0.4s var(--ease-soft) both;
+  /*
+   * Loading M: the two halves turn separately around the shared hinge (rotateY 0→180→360 each). Per swap the
+   * left half leads (swinging forward), the right half follows 0.4 s behind (swinging back), so the halves open
+   * into a turning V instead of folding flat; each swap takes 1.7 s and the M then rests 0.7 s.
+   * While the halves pass each other they also swing a little (individual `rotate`, applied after the turn) around
+   * the same upper joint, each leaning towards where it is heading, so they stay two distinct shapes instead of
+   * reading as one arch. Every rotation pivots on the joint, so the halves never separate there.
+   * White keeps a 1px lead in depth so it sits in front of the lime half at rest, as in the logo.
+   */
+  --ease-m-turn: cubic-bezier(0.37, 0, 0.63, 1);
+  --animate-m-half-a: m-half-a 4.8s linear infinite, m-splay-a 4.8s linear infinite;
+  --animate-m-half-b: m-half-b 4.8s linear infinite, m-splay-b 4.8s linear infinite;
+
+  @keyframes m-half-a {
+    0%,
+    6% {
+      transform: translateZ(1px) rotateY(0deg);
+      animation-timing-function: var(--ease-m-turn);
+    }
+    33.1%,
+    64.3% {
+      transform: translateZ(1px) rotateY(180deg);
+      animation-timing-function: var(--ease-m-turn);
+    }
+    91.4%,
+    100% {
+      transform: translateZ(1px) rotateY(360deg);
+    }
+  }
+  @keyframes m-half-b {
+    0%,
+    14.3% {
+      transform: rotateY(0deg);
+      animation-timing-function: var(--ease-m-turn);
+    }
+    41.4%,
+    56% {
+      transform: rotateY(180deg);
+      animation-timing-function: var(--ease-m-turn);
+    }
+    83.1%,
+    100% {
+      transform: rotateY(360deg);
+    }
+  }
+
+  @keyframes m-splay-a {
+    0%,
+    12.5%,
+    34.4%,
+    62.5%,
+    84.4%,
+    100% {
+      rotate: 0deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+    23.7% {
+      rotate: -18deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+    73.7% {
+      rotate: 18deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+  }
+  @keyframes m-splay-b {
+    0%,
+    12.5%,
+    34.4%,
+    62.5%,
+    84.4%,
+    100% {
+      rotate: 0deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+    23.7% {
+      rotate: 18deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+    73.7% {
+      rotate: -18deg;
+      animation-timing-function: var(--ease-m-turn);
+    }
+  }
 
   @keyframes rise {
     from {
@@ -193,30 +282,31 @@
 }
 
 /*
- * Mizano palette — botanical wellness: warm ivory + deep fern greens, with a restrained
- * sage / amber / terracotta / water-blue for the macros. Brand green matches the logo (#1d6b4f).
+ * Mizano palette — derived from the official logo: deep green #1e6337 (primary), mid green #178258,
+ * lime #c3e828 (accent fills only, always with dark text), calm neutral surfaces. Macros keep distinct
+ * blue / amber / terracotta. Lime never appears as text on light surfaces (contrast < 3:1).
  */
 :root {
   color-scheme: light;
-  --background: oklch(0.978 0.009 100);
-  --foreground: oklch(0.235 0.028 160);
-  --card: oklch(0.995 0.004 100);
-  --card-foreground: oklch(0.235 0.028 160);
-  --popover: oklch(0.997 0.003 100);
-  --popover-foreground: oklch(0.235 0.028 160);
-  --primary: oklch(0.45 0.092 162);
-  --primary-foreground: oklch(0.985 0.01 100);
-  --secondary: oklch(0.948 0.014 125);
-  --secondary-foreground: oklch(0.27 0.035 160);
-  --muted: oklch(0.953 0.01 105);
-  --muted-foreground: oklch(0.47 0.022 158);
-  --accent: oklch(0.935 0.03 150);
-  --accent-foreground: oklch(0.3 0.062 160);
+  --background: #f7f8f5;
+  --foreground: #17201a;
+  --card: #ffffff;
+  --card-foreground: #17201a;
+  --popover: #ffffff;
+  --popover-foreground: #17201a;
+  --primary: #1e6337;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2ee;
+  --secondary-foreground: #1f2b23;
+  --muted: #f0f2ef;
+  --muted-foreground: #56615a;
+  --accent: #eef5d6;
+  --accent-foreground: #2f4a0f;
   --destructive: oklch(0.56 0.2 27);
-  --border: oklch(0.9 0.012 120);
-  --input: oklch(0.875 0.014 115);
-  --ring: oklch(0.5 0.1 162);
-  --energy: oklch(0.45 0.092 162);
+  --border: #dfe4df;
+  --input: #d3d9d4;
+  --ring: #1e6337;
+  --energy: #178258;
   --protein: oklch(0.52 0.105 232);
   --carbs: oklch(0.7 0.14 74);
   --fat: oklch(0.6 0.145 36);
@@ -227,8 +317,21 @@
   --minor-fill: oklch(0.8 0.15 78);
   --minor-fill-foreground: oklch(0.26 0.06 60);
   /* Lime from the logo's second stroke. */
-  --brand-lime: oklch(0.86 0.2 125);
-  --brand-lime-foreground: oklch(0.3 0.07 150);
+  --brand-lime: #c3e828;
+  --brand-lime-foreground: #1f2a10;
+  /* Sign-in provider buttons: Google's light theme surface (also used for email/phone so all match). */
+  --provider: #ffffff;
+  --provider-border: #747775;
+  --provider-foreground: #1f1f1f;
+  /* Sign in with Apple: "white with outline" on light backgrounds. */
+  --apple: #ffffff;
+  --apple-foreground: #000000;
+  /* Outline M (loading): --mark-a = the logo's white arch, --mark-b = lime arch, --mark-b-edge = its casing,
+     --mark-fill = the surface the mark sits on (hides the half behind; override on non-background surfaces). */
+  --mark-fill: var(--background);
+  --mark-a: #1e6337;
+  --mark-b: #c3e828;
+  --mark-b-edge: #1e6337;
   --chart-1: var(--energy);
   --chart-2: var(--protein);
   --chart-3: var(--carbs);
@@ -236,46 +339,46 @@
   --chart-5: oklch(0.6 0.02 155);
   --radius: 0.875rem;
 
-  /* Hero surface (deep fern gradient) and its on-dark macro colours. Same in both themes. */
-  --hero-from: oklch(0.36 0.075 163);
-  --hero-to: oklch(0.27 0.055 168);
+  /* Hero surface (deep logo-green gradient) and its on-dark macro colours. Same in both themes. */
+  --hero-from: #1e6337;
+  --hero-to: #143f26;
   --hero-foreground: oklch(0.975 0.012 110);
   --hero-muted: oklch(0.975 0.012 110 / 72%);
   --hero-track: oklch(1 0 0 / 14%);
-  --hero-energy: oklch(0.9 0.13 148);
+  --hero-energy: #c3e828;
   --hero-protein: oklch(0.82 0.1 225);
   --hero-carbs: oklch(0.86 0.13 82);
   --hero-fat: oklch(0.8 0.115 38);
 
-  --glass: oklch(0.995 0.004 100 / 74%);
+  --glass: rgb(255 255 255 / 78%);
   --glass-border: oklch(0.3 0.04 160 / 9%);
 
   --elev-soft: 0 1px 2px oklch(0.3 0.05 160 / 5%), 0 4px 14px -6px oklch(0.3 0.05 160 / 10%);
   --elev-lift: 0 2px 4px oklch(0.3 0.05 160 / 6%), 0 14px 32px -12px oklch(0.3 0.06 160 / 22%);
-  --elev-glow: inset 0 1px 0 oklch(1 0 0 / 18%), 0 8px 20px -8px oklch(0.45 0.092 162 / 55%);
+  --elev-glow: inset 0 1px 0 oklch(1 0 0 / 18%), 0 8px 20px -8px rgb(30 99 55 / 45%);
 }
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.168 0.014 165);
-  --foreground: oklch(0.95 0.008 100);
-  --card: oklch(0.21 0.016 165);
-  --card-foreground: oklch(0.95 0.008 100);
-  --popover: oklch(0.23 0.017 165);
-  --popover-foreground: oklch(0.95 0.008 100);
-  --primary: oklch(0.76 0.13 158);
-  --primary-foreground: oklch(0.18 0.03 160);
-  --secondary: oklch(0.26 0.017 165);
-  --secondary-foreground: oklch(0.93 0.01 100);
-  --muted: oklch(0.25 0.014 165);
-  --muted-foreground: oklch(0.72 0.016 125);
-  --accent: oklch(0.31 0.045 160);
-  --accent-foreground: oklch(0.93 0.04 155);
+  --background: #121614;
+  --foreground: #eef1ee;
+  --card: #1a201c;
+  --card-foreground: #eef1ee;
+  --popover: #1e2520;
+  --popover-foreground: #eef1ee;
+  --primary: #4fbf7f;
+  --primary-foreground: #0e1a12;
+  --secondary: #222a25;
+  --secondary-foreground: #e6ebe7;
+  --muted: #202723;
+  --muted-foreground: #a3ada6;
+  --accent: #2a3320;
+  --accent-foreground: #ddf28a;
   --destructive: oklch(0.68 0.18 25);
   --border: oklch(1 0 0 / 9%);
   --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.76 0.13 158);
-  --energy: oklch(0.76 0.13 158);
+  --ring: #4fbf7f;
+  --energy: #4fbf7f;
   --protein: oklch(0.74 0.1 235);
   --carbs: oklch(0.82 0.13 80);
   --fat: oklch(0.73 0.13 35);
@@ -284,18 +387,27 @@
   --minor: oklch(0.83 0.14 80);
   --minor-fill: oklch(0.8 0.15 78);
   --minor-fill-foreground: oklch(0.22 0.05 60);
-  --brand-lime: oklch(0.88 0.19 125);
-  --brand-lime-foreground: oklch(0.26 0.06 150);
+  --brand-lime: #c3e828;
+  --brand-lime-foreground: #1f2a10;
+  /* Google dark theme surface; Apple "white" style on dark backgrounds. */
+  --provider: #131314;
+  --provider-border: #8e918f;
+  --provider-foreground: #e3e3e3;
+  --apple: #ffffff;
+  --apple-foreground: #000000;
+  --mark-a: #eaf0ec;
+  --mark-b: #c3e828;
+  --mark-b-edge: transparent;
 
-  --hero-from: oklch(0.33 0.065 163);
-  --hero-to: oklch(0.235 0.045 168);
+  --hero-from: #1c5a33;
+  --hero-to: #112a1b;
 
-  --glass: oklch(0.22 0.016 165 / 72%);
+  --glass: rgb(26 32 28 / 76%);
   --glass-border: oklch(1 0 0 / 10%);
 
   --elev-soft: 0 1px 2px oklch(0 0 0 / 30%), 0 4px 14px -6px oklch(0 0 0 / 40%);
   --elev-lift: 0 2px 4px oklch(0 0 0 / 35%), 0 16px 34px -12px oklch(0 0 0 / 60%);
-  --elev-glow: inset 0 1px 0 oklch(1 0 0 / 28%), 0 8px 22px -8px oklch(0.76 0.13 158 / 45%);
+  --elev-glow: inset 0 1px 0 oklch(1 0 0 / 28%), 0 8px 22px -8px rgb(79 191 127 / 40%);
 }
 
 @layer base {
@@ -308,11 +420,6 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: 'tnum' 0;
-    /* Faint botanical wash: two large soft sage/mint glows that follow the theme. */
-    background-image:
-      radial-gradient(60rem 36rem at 100% -10%, color-mix(in oklch, var(--primary) 7%, transparent), transparent 70%),
-      radial-gradient(46rem 30rem at -10% 110%, color-mix(in oklch, var(--carbs) 6%, transparent), transparent 70%);
-    background-attachment: fixed;
   }
   input[type='number']::-webkit-inner-spin-button,
   input[type='number']::-webkit-outer-spin-button {
@@ -344,7 +451,7 @@
   backdrop-filter: blur(18px) saturate(1.5);
 }
 
-/* Deep-fern gradient used by the Today hero. */
+/* Deep logo-green gradient used by the Today hero. */
 @utility surface-hero {
   color: var(--hero-foreground);
   background-image:

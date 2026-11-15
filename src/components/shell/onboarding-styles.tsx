@@ -3,7 +3,7 @@
  * Shared keyframes for the onboarding experience, injected once near the root.
  * Kept inline (not a .css file) because the GitHub connector blocks .css writes;
  * content is identical to what a static sheet would contain. Reduced-motion is
- * enforced by both the media query and the JS-side usePrefersReducedMotion.
+ * enforced by both the media query and the JS-side usePrefersReducedMotion hook.
  */
 export function OnboardingStyles() {
   return (

@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { usePrefersReducedMotion } from './onboarding-growths'
+import { usePrefersReducedMotion } from '@/hooks/use-reduced-motion'
 
 /**
  * Direction-aware single-panel crossfade/slide for step content.

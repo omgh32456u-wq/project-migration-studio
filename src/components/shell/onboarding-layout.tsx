@@ -2,9 +2,7 @@ import type { ReactNode } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { BrandMark } from '@/components/common/brand-mark'
 import { useStore } from '@/components/providers/app-store'
-import { OnboardingPlant } from './onboarding-plant'
 import { OnboardingStyles } from './onboarding-styles'
-import type { GrowthState } from './onboarding-growths'
 
 /**
  * Onboarding shell. It is pinned to the visible viewport (fixed, h-dvh, overflow hidden) so no step ever
@@ -13,17 +11,17 @@ import type { GrowthState } from './onboarding-growths'
  * - Desktop (lg+): a calm brand column on the start side, the header and step on the other.
  * Background is the plain theme background — no gradients.
  */
-export function OnboardingLayout({ growth, header, children }: { growth: GrowthState; header: ReactNode; children: ReactNode }) {
+export function OnboardingLayout({ header, children }: { header: ReactNode; children: ReactNode }) {
   const { t } = useStore().i18n
   return (
     <main className="fixed inset-0 flex h-dvh flex-col overflow-hidden bg-background lg:flex-row">
       <aside className="hidden w-[min(40%,30rem)] shrink-0 flex-col border-e bg-card px-10 py-10 lg:flex">
         <div className="flex items-center gap-3">
-          <BrandMark className="size-12" />
+          <BrandMark className="size-11" />
           <span className="text-xl font-semibold tracking-tight">{t('app.name')}</span>
         </div>
         <div className="flex min-h-0 flex-1 items-center justify-center py-8">
-          <OnboardingPlant state={growth} className="h-64 max-h-full w-auto text-primary xl:h-72" />
+          <BrandMark className="size-40 max-h-full xl:size-48" />
         </div>
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <ShieldCheck className="size-3.5 shrink-0" aria-hidden />

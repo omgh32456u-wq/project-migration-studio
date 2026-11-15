@@ -7,7 +7,7 @@ import { Field, Notice, NumberInput } from '@/components/common/controls'
 import { MACRO_KEYS, macroColor } from '@/components/common/nutrition'
 import { useStore } from '@/components/providers/app-store'
 import { useAction } from '@/components/providers/use-action'
-import { estimateMaintenance, macroGramTargets, parseLocaleNumber, targetEligibility, TARGET_LIMITS, validateTargets } from '@/lib/nutrition'
+import { estimateMaintenance, isTeen, macroGramTargets, minTargetKcal, parseLocaleNumber, targetEligibility, TARGET_LIMITS, validateTargets } from '@/lib/nutrition'
 import type { MacroKey, Targets } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { SettingsSection } from './settings-section'
@@ -21,7 +21,7 @@ export function TargetsCard() {
   return (
     <SettingsSection id="targets" title={t('targets.title')} badge={t('targets.optional')}>
       {!elig.ok ? (
-        <Notice icon={<ShieldCheck />}>{elig.reason === 'minor' ? t('targets.minor') : t('targets.ageUnknown')}</Notice>
+        <Notice icon={<ShieldCheck />}>{elig.reason === 'teen_details' ? t('targets.teenDetails') : t('targets.ageUnknown')}</Notice>
       ) : (
         <TargetsForm key={`${targets.kcal}:${targets.proteinPct}:${targets.carbsPct}:${targets.fatPct}:${targets.enabled}`} initial={targets} />
       )}
@@ -42,6 +42,9 @@ function TargetsForm({ initial }: { initial: Targets }) {
   })
   const [error, setError] = useState<string | null>(null)
   const estimate = estimateMaintenance(store.settings.profile)
+  const teen = isTeen(store.settings.profile)
+  const floor = minTargetKcal(store.settings.profile)
+  const kcalErrorText = (msg: string) => msg === t('targets.error.kcal_range') || msg === t('targets.error.teen_floor', { n: fmtNum(floor) })
 
   const parsed = {
     kcal: parseLocaleNumber(kcal),
@@ -54,8 +57,8 @@ function TargetsForm({ initial }: { initial: Targets }) {
 
   const save = () => {
     if (enabled) {
-      const err = validateTargets(parsed)
-      if (err) return setError(t(`targets.error.${err}`))
+      const err = validateTargets(parsed, floor)
+      if (err) return setError(err === 'teen_floor' ? t('targets.error.teen_floor', { n: fmtNum(floor) }) : t(`targets.error.${err}`))
     }
     setError(null)
     const next: Targets = {
@@ -84,7 +87,7 @@ function TargetsForm({ initial }: { initial: Targets }) {
 
       {enabled && (
         <>
-          <Field label={t('targets.kcal')} error={error && error === t('targets.error.kcal_range') ? error : null}>
+          <Field label={t('targets.kcal')} error={error && kcalErrorText(error) ? error : null}>
             {({ id, describedBy, invalid }) => (
               <NumberInput id={id} aria-describedby={describedBy} aria-invalid={invalid} value={kcal} onChange={(e) => setKcal(e.target.value)} className="w-40" />
             )}
@@ -98,7 +101,8 @@ function TargetsForm({ initial }: { initial: Targets }) {
             {estimate.ok ? (
               <>
                 <p className="text-lg font-semibold tabular-nums">{t('targets.estimateValue', { n: fmtNum(estimate.maintenance) })}</p>
-                <p className="text-xs leading-relaxed text-muted-foreground">{t('targets.estimateAssumptions')}</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">{t(estimate.method === 'teen_eer' ? 'targets.estimateTeen' : 'targets.estimateAssumptions')}</p>
+                {teen && <p className="text-xs leading-relaxed text-muted-foreground">{t('targets.teenNote')}</p>}
                 <Button
                   type="button"
                   variant="outline"
@@ -130,12 +134,12 @@ function TargetsForm({ initial }: { initial: Targets }) {
             <p className={cn('text-xs tabular-nums', Math.round(sum) === 100 ? 'text-muted-foreground' : 'font-medium text-destructive')}>
               {t('targets.sum', { n: fmtNum(sum, 1) })}
             </p>
-            <p className="text-xs text-muted-foreground">{t('targets.amdr')}</p>
+            <p className="text-xs text-muted-foreground">{t(teen ? 'targets.amdrTeen' : 'targets.amdr')}</p>
           </fieldset>
         </>
       )}
 
-      {error && error !== t('targets.error.kcal_range') && (
+      {error && !kcalErrorText(error) && (
         <p className="text-xs font-medium text-destructive" role="alert">
           {error}
         </p>

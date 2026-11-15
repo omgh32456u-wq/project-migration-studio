@@ -1,16 +1,21 @@
 
 import { Link, useLocation } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
-import { AlertTriangle, BookOpen, CalendarDays, ChartColumn, Settings } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { AlertTriangle, BookOpen, Bot, CalendarDays, ChartColumn, Settings } from 'lucide-react'
+import { AvatarButton } from '@/components/account/account-avatar'
 import { BrandMark } from '@/components/common/brand-mark'
+import { LoadingMark } from '@/components/common/loading-mark'
 import { useStore } from '@/components/providers/app-store'
-import type { MessageKey } from '@/lib/i18n'
+import { createTranslator, type MessageKey } from '@/lib/i18n'
+import type { Locale } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Onboarding } from './onboarding'
 
-const NAV: { href: '/' | '/foods' | '/progress' | '/settings'; label: MessageKey; icon: typeof CalendarDays }[] = [
+// Mizo sits in the centre of the five destinations (bottom bar) and in the same order in the sidebar.
+const NAV: { href: '/' | '/foods' | '/mizo' | '/progress' | '/settings'; label: MessageKey; icon: typeof CalendarDays }[] = [
   { href: '/', label: 'nav.today', icon: CalendarDays },
   { href: '/foods', label: 'nav.foods', icon: BookOpen },
+  { href: '/mizo', label: 'nav.mizo', icon: Bot },
   { href: '/progress', label: 'nav.progress', icon: ChartColumn },
   { href: '/settings', label: 'nav.settings', icon: Settings },
 ]
@@ -23,17 +28,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const store = useStore()
   const pathname = useLocation({ select: (l) => l.pathname })
   const { t } = store.i18n
+  // While data opens, settings are still defaults; the saved language is already on <html lang> (boot script).
+  // Read it after hydration so the visible message is in the user's language and server markup still matches.
+  const [bootLocale, setBootLocale] = useState<Locale | null>(null)
+  useEffect(() => setBootLocale(document.documentElement.lang === 'ar' ? 'ar' : 'en'), [])
 
   if (store.status === 'loading') {
-    return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4" role="status" aria-live="polite">
-        <div className="relative">
-          <span className="absolute inset-0 animate-ping rounded-[28%] bg-primary/25 motion-reduce:hidden" aria-hidden />
-          <BrandMark className="relative size-16 shadow-lift" />
-        </div>
-        <p className="animate-fade-in text-sm text-muted-foreground">{t('common.loading')}</p>
-      </div>
-    )
+    const label = bootLocale ? createTranslator(bootLocale).t('common.loading') : ''
+    return <LoadingMark label={label} className="min-h-dvh" />
   }
 
   if (store.status === 'error' || store.status === 'blocked' || store.status === 'stale') {
@@ -56,10 +58,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-8 border-e bg-card/70 px-4 py-7 backdrop-blur-md lg:flex">
         <div className="flex items-center gap-3 px-2">
           <BrandMark className="size-10" />
-          <div className="flex min-w-0 flex-col">
+          <div className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-base font-semibold tracking-tight">{t('app.name')}</span>
             <span className="truncate text-xs text-muted-foreground">{t('onboarding.privacy')}</span>
           </div>
+          <AvatarButton />
         </div>
         <nav aria-label={t('nav.main')} className="flex flex-col gap-1">
           {NAV.map(({ href, label, icon: Icon }) => {
@@ -99,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-label={t('nav.main')}
         className="glass fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 mx-auto max-w-md rounded-3xl shadow-lift lg:hidden"
       >
-        <ul className="grid grid-cols-4 p-1.5">
+        <ul className="grid grid-cols-5 p-1.5">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = isActive(pathname, href)
             return (
@@ -108,12 +111,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                   to={href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-medium transition-all duration-200 active:scale-95',
+                    'flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-0.5 text-[11px] font-medium transition-all duration-200 active:scale-95',
                     active ? 'bg-primary/12 text-primary' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   <Icon className={cn('size-5 transition-transform duration-200', active && 'scale-110')} aria-hidden />
-                  {t(label)}
+                  <span className="max-w-full truncate">{t(label)}</span>
                 </Link>
               </li>
             )

@@ -5,7 +5,7 @@ import { useStore } from '@/components/providers/app-store'
 
 /**
  * Screen-reader progress ("Step N of M") plus a compact visual indicator.
- * `onHero` swaps the visual palette for use on the deep-fern gradient panels;
+ * `onHero` swaps the visual palette for use on the deep logo-green gradient panels;
  * the announcement is theme-agnostic. Rendered only after mount so the live
  * region exists before steps change (and so SSR/client markup match).
  */

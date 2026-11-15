@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { Info } from 'lucide-react'
 import { Field, NativeSelect, Notice, NumberInput, Segmented } from '@/components/common/controls'
 import { useStore } from '@/components/providers/app-store'
-import { CM_PER_IN, kgToLb, lbToKg, parseLocaleNumber } from '@/lib/nutrition'
+import { ADULT_AGE, CM_PER_IN, kgToLb, lbToKg, MIN_AGE, parseLocaleNumber } from '@/lib/nutrition'
 import type { ActivityLevel, AgeGroup, Profile, Sex } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -41,8 +41,11 @@ export function ProfileForm({
     const ageN = parse(age)
     const hN = parse(height)
     const wN = parse(weight)
-    const adult = ageGroup === 'adult'
-    if (adult && age.trim() !== '' && (ageN === null || ageN < 18 || ageN > 100 || !Number.isInteger(ageN))) errs.age = t('settings.ageError')
+    // Ages 15–17 and adults enter the same details; only the allowed age range differs.
+    const known = ageGroup !== 'unspecified'
+    const [minAge, maxAge] = ageGroup === 'under18' ? [MIN_AGE, ADULT_AGE - 1] : [ADULT_AGE, 100]
+    if (known && age.trim() !== '' && (ageN === null || ageN < minAge || ageN > maxAge || !Number.isInteger(ageN)))
+      errs.age = t(ageGroup === 'under18' ? 'settings.ageErrorTeen' : 'settings.ageError')
     const heightCm = hN === null ? null : imperial ? hN * CM_PER_IN : hN
     if (height.trim() !== '' && (heightCm === null || heightCm < 50 || heightCm > 250)) errs.height = t('common.invalidNumber')
     const weightKg = wN === null ? null : imperial ? lbToKg(wN) : wN
@@ -52,11 +55,11 @@ export function ProfileForm({
     onSubmit({
       ...initial,
       ageGroup,
-      age: adult ? ageN : null,
-      sex: adult ? sex : initial.sex,
+      age: known ? ageN : null,
+      sex: known ? sex : initial.sex,
       heightCm: heightCm === null ? null : Math.round(heightCm * 10) / 10,
       weightKg: weightKg === null ? null : Math.round(weightKg * 10) / 10,
-      activity: adult && activity ? activity : adult ? null : initial.activity,
+      activity: known && activity ? activity : known ? null : initial.activity,
     })
   }
 
@@ -80,10 +83,14 @@ export function ProfileForm({
           />
         </div>
       )}
-      {ageGroup === 'under18' && <Notice icon={<Info />}>{t('targets.minor')}</Notice>}
+      {ageGroup === 'under18' && (
+        <p role="note" className="rounded-xl border border-minor/40 px-3 py-1.5 text-xs text-minor">
+          {t('onboarding.age.under18')}
+        </p>
+      )}
       {ageGroup === 'unspecified' && <Notice icon={<Info />}>{t('targets.ageUnknown')}</Notice>}
 
-      {ageGroup === 'adult' && (
+      {ageGroup !== 'unspecified' && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('settings.age')} error={errors.age}>
             {({ id, describedBy, invalid }) => (
@@ -117,7 +124,7 @@ export function ProfileForm({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {ageGroup === 'adult' && (
+        {ageGroup !== 'unspecified' && (
           <Field label={t('settings.height', { unit: t(imperial ? 'unit.in' : 'unit.cm') })} error={errors.height}>
             {({ id, describedBy, invalid }) => (
               <NumberInput id={id} aria-describedby={describedBy} aria-invalid={invalid} value={height} onChange={(e) => setHeight(e.target.value)} />

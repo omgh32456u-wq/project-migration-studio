@@ -7,7 +7,6 @@ import { StepTransition } from './onboarding-transition'
 import { AuthStep } from './onboarding-auth'
 import { ProfileWheelsPanel } from './onboarding-wheels-panel'
 import { WelcomePanel } from './onboarding-welcome'
-import { growthState } from './onboarding-growths'
 import type { Locale, Profile, ThemePref } from '@/lib/types'
 
 /** Auth -> Welcome -> Profile (day start lives inside Profile). */
@@ -43,13 +42,12 @@ export function Onboarding() {
   }, [step, go, total])
 
   const api = { step, dir, settings, t, setPref, setStep: go, setDayStart, onSetProfile, finish, next }
-  const growth = growthState(step, total)
 
   return (
-    <OnboardingLayout growth={growth} header={<OnboardingHeader step={step} total={total} settings={settings} setPref={setPref} t={t} />}>
+    <OnboardingLayout header={<OnboardingHeader step={step} total={total} settings={settings} setPref={setPref} t={t} />}>
       <StepTransition stepKey={step} dir={dirMotion}>
         {step === 0 && <AuthStep api={api} onSkip={() => go(1)} />}
-        {step === 1 && <WelcomePanel api={api} growth={growth} />}
+        {step === 1 && <WelcomePanel api={api} />}
         {step === 2 && <ProfileWheelsPanel api={api} />}
       </StepTransition>
     </OnboardingLayout>

@@ -147,6 +147,17 @@ export interface Targets {
   fatPct: number
 }
 
+/**
+ * Display name and photo for a signed-in account, cached on this device. `userId` ties the cache to
+ * one account so a different account on the same device never inherits it.
+ */
+export interface AccountProfile {
+  userId: string | null
+  displayName: string
+  /** Downscaled image as a data: URL, kept on this device only. */
+  avatar: string | null
+}
+
 export interface Settings {
   locale: Locale
   theme: ThemePref
@@ -159,6 +170,7 @@ export interface Settings {
    * new entries and "today" belong to; entries keep the day they were logged under.
    */
   dayStartMinutes: number
+  account: AccountProfile
 }
 
 export interface AppData {

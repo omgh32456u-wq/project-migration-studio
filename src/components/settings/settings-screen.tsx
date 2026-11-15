@@ -1,6 +1,7 @@
 
 import { useState } from 'react'
 import { Info } from 'lucide-react'
+import { AvatarButton } from '@/components/account/account-avatar'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Field, Notice, PageHeader, Segmented, TextInput } from '@/components/common/controls'
@@ -9,6 +10,7 @@ import { useAction } from '@/components/providers/use-action'
 import { MEAL_SLOTS, type MealSlot, type Profile } from '@/lib/types'
 import { DataCard } from './data-card'
 import { DayStartField } from './day-start-field'
+import { MizoPrivacyCard } from './mizo-privacy-card'
 import { ProfileForm } from './profile-form'
 import { RemindersCard } from './reminders-card'
 
@@ -22,7 +24,7 @@ export function SettingsScreen() {
   const { t } = useStore().i18n
   return (
     <div className="flex flex-col">
-      <PageHeader title={t('settings.title')} />
+      <PageHeader title={t('settings.title')} actions={<AvatarButton className="lg:hidden" />} />
       <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         <div className="flex flex-col gap-5">
           <PreferencesCard />
@@ -33,6 +35,7 @@ export function SettingsScreen() {
         </div>
         <div className="flex flex-col gap-5">
           <TargetsCard />
+          <MizoPrivacyCard />
           <DataCard />
           <SettingsSection id="about" title={t('about.title')}>
             <p className="text-sm leading-relaxed text-muted-foreground">{t('about.body')}</p>
@@ -140,8 +143,8 @@ function ProfileCard() {
         store.updateSettings((s) => ({
           ...s,
           profile: { ...p, onboarded: true },
-          // Personal targets are only offered to confirmed adults.
-          targets: p.ageGroup === 'adult' ? s.targets : { ...s.targets, enabled: false },
+          // Optional targets need a known age; age itself never blocks them.
+          targets: p.ageGroup === 'unspecified' ? { ...s.targets, enabled: false } : s.targets,
         })),
       { success: t('settings.profileSaved') },
     )

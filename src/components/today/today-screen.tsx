@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, RotateCcw, Salad } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { AvatarButton } from '@/components/account/account-avatar'
 import { BrandMark } from '@/components/common/brand-mark'
 import { Card, EmptyState } from '@/components/common/controls'
 import { useNutritionFormat } from '@/components/common/nutrition'
@@ -83,10 +84,13 @@ export function TodayScreen() {
             <BrandMark className="size-9" />
             <span className="text-lg font-semibold tracking-tight">{t('app.name')}</span>
           </div>
-          <Button size="lg" className="hidden sm:inline-flex" onClick={() => openAdd()}>
-            <Plus aria-hidden />
-            {t('today.addFood')}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button size="lg" className="hidden sm:inline-flex" onClick={() => openAdd()}>
+              <Plus aria-hidden />
+              {t('today.addFood')}
+            </Button>
+            <AvatarButton />
+          </div>
         </div>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1 lg:max-w-xl">

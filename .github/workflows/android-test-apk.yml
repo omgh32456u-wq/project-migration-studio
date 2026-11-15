@@ -20,7 +20,7 @@ jobs:
     name: Build installable bundled Android APK
     runs-on: ubuntu-latest
     env:
-      VITE_MIZO_API_ORIGIN: https://project-migration-studio-rkshdtk3o-ndnskvksjcjjdjdj-5162.vercel.app
+      VITE_MIZO_API_ORIGIN: https://project-migration-studio-git-devel-e73b2f-ndnskvksjcjjdjdj-5162.vercel.app
     steps:
       - name: Check out test branch
         uses: actions/checkout@v4

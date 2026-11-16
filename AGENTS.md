@@ -31,7 +31,7 @@ use the editor.
 
 ## Project rules (Mizano)
 
-- App data (foods, logs, settings, Mizo chat and Mizo consent) lives only on the device in IndexedDB (`src/lib/storage/db.ts`; Mizo history and consent in their own `mizano-mizo` database, keyed by account id). The external Supabase project is used for Auth plus one server-written table, `mizo_requests` (usage counts only, never chat text); nothing else is synced. Why: private, offline-first, guest-friendly; moving data across devices goes through backup export/import in Settings.
+- App data (foods, logs, settings, Mizo chat and Mizo consent) lives only on the device in IndexedDB (`src/lib/storage/db.ts`; Mizo chats (many per account, keyed by conversation id and scoped by account id; last open chat per account) and consent in their own `mizano-mizo` database). The external Supabase project is used for Auth plus one server-written table, `mizo_requests` (usage counts only, never chat text); nothing else is synced. Why: private, offline-first, guest-friendly; moving data across devices goes through backup export/import in Settings.
 - UI kit is shadcn on `@base-ui/react` (not Radix) in `src/components/ui`; the base-ui `data-*` variants are inlined at the top of `src/styles.css`. Why: ported as-is from the original app.
 - Every user-visible string goes through `t()` with keys in both `src/lib/i18n/en*.ts` and `ar*.ts`. Why: full Arabic (RTL) and English support is a core feature.
 - Capacitor plugins are only lazy-imported behind `isNativeApp()` in `src/lib/native.ts`. Why: the web build must never load native code; they exist for the Android shell's share sheet.

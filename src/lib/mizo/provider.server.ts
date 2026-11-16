@@ -62,7 +62,6 @@ export async function* parseOpenAiSse(body: ReadableStream<Uint8Array>): AsyncGe
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  let sawData = false
   let done = false
   try {
     while (!done) {
@@ -91,7 +90,8 @@ export async function* parseOpenAiSse(body: ReadableStream<Uint8Array>): AsyncGe
           const code = typeof err.code === 'string' ? err.code : typeof err.type === 'string' ? err.type : ''
           throw new ProviderError(/rate/.test(code) ? 'provider_rate_limited' : /quota|insufficient|credit/.test(code) ? 'provider_quota' : 'provider_unavailable')
         }
-        sawData = true
+        const choice = (json as { choices?: Array<{ finish_reason?: unknown }> })?.choices?.[0]
+        if (choice?.finish_reason === 'length') throw new ProviderError('provider_malformed')
         const text = chunkText(json)
         if (text) yield text
       }
@@ -99,7 +99,9 @@ export async function* parseOpenAiSse(body: ReadableStream<Uint8Array>): AsyncGe
   } finally {
     reader.releaseLock()
   }
-  if (!done && !sawData) throw new ProviderError('provider_malformed')
+  // A clean socket close is not proof that the model completed its answer.
+  // OpenAI-compatible streams must send [DONE]; otherwise surface an incomplete reply.
+  if (!done) throw new ProviderError('provider_malformed')
 }
 
 export function createOpenAiCompatibleProvider(config: MizoProviderConfig & { apiKey: string }, fetchImpl: typeof fetch = fetch): ChatProvider {

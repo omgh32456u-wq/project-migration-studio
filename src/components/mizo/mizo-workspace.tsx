@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { ArrowUp, CloudOff, Info, Plus, RotateCcw, ShieldCheck, Square, Trash2, TriangleAlert } from 'lucide-react'
+import { ArrowUp, CloudOff, Info, Menu, Pencil, Plus, RotateCcw, ShieldCheck, Square, SquarePen, Trash2, TriangleAlert } from 'lucide-react'
 import { BrandMark } from '@/components/common/brand-mark'
 import { LoadingMark } from '@/components/common/loading-mark'
 import { Card } from '@/components/common/controls'
@@ -16,7 +16,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { sharedChatStore, type ChatStore, type MizoConsent, type MizoConversation, type MizoMessage } from '@/lib/mizo/chat-store'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { newConversation, newId, sharedChatStore, titleFrom, type ChatStore, type MizoConsent, type MizoConversation, type MizoMessage } from '@/lib/mizo/chat-store'
 import { buildMizoRequest, createMizoTransport, type MizoTransport, type MizoUsage } from '@/lib/mizo/client'
 import { MIZO_CONSENT_VERSION, type MizoErrorCode } from '@/lib/mizo/protocol'
 import type { MessageKey } from '@/lib/i18n'
@@ -95,9 +98,6 @@ function useOnline() {
   return online
 }
 
-function newId(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
 
 /** The explicit, reversible opt-in shown before anything is sent. */
 function ConsentCard({ revoked, onAgree, busy }: { revoked: boolean; onAgree: () => void; busy: boolean }) {
@@ -137,7 +137,10 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
   const [consentBusy, setConsentBusy] = useState(false)
   const [draft, setDraft] = useState('')
   const [attachNote, setAttachNote] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [chats, setChats] = useState<MizoConversation[]>([])
+  const [listOpen, setListOpen] = useState(false)
+  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState(false)
   const [saveError, setSaveError] = useState(false)
   const [pending, setPending] = useState<Pending | null>(null)
@@ -157,12 +160,15 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
     let live = true
     getStore()
       .then(async (s) => {
-        const [c, k] = await Promise.all([s.load(userId), s.loadConsent(userId).catch(() => null)])
+        const [list, activeId, k] = await Promise.all([s.list(userId), s.getActive(userId), s.loadConsent(userId).catch(() => null)])
         if (!live) return
-        const conversation = c.userId === userId ? c : { ...c, userId, messages: [] }
+        const own = list.filter((c) => c.userId === userId)
+        const conversation = own.find((c) => c.id === activeId) ?? own[0] ?? newConversation(userId)
         convRef.current = conversation
+        setChats(own)
         setConsent(k && k.userId === userId ? k : null)
         setState({ status: 'ready', conversation })
+        if (conversation.id !== activeId && own.length) await s.setActive(userId, conversation.id).catch(() => setSaveError(true))
       })
       .catch(() => live && setState({ status: 'error' }))
     return () => {
@@ -177,16 +183,23 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
 
   const persist = useCallback(
     async (conversation: MizoConversation) => {
-      convRef.current = conversation
-      setState({ status: 'ready', conversation })
+      if (conversation.userId !== userId) return
+      // A reply for a chat that is no longer open is saved to that chat, never shown in the open one.
+      if (convRef.current?.id === conversation.id) {
+        convRef.current = conversation
+        setState({ status: 'ready', conversation })
+      }
+      setChats((list) => [conversation, ...list.filter((c) => c.id !== conversation.id)])
       try {
-        await (await getStore()).save(conversation)
+        const s = await getStore()
+        await s.save(conversation)
+        if (convRef.current?.id === conversation.id) await s.setActive(userId, conversation.id)
         setSaveError(false)
       } catch {
         setSaveError(true)
       }
     },
-    [getStore],
+    [getStore, userId],
   )
 
   const granted = consentGranted(consent)
@@ -228,8 +241,9 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
     abortRef.current = null
     setPending(null)
     if (result.usage) setUsage(result.usage)
-    const latest = convRef.current
-    if (text.trim() && latest && latest.userId === userId) {
+    const origin = conversation.id
+    const latest = convRef.current?.id === origin ? convRef.current : await getStore().then((s) => s.get(userId, origin)).catch(() => null)
+    if (text.trim() && latest && latest.userId === userId && latest.id === origin) {
       const reply: MizoMessage = {
         id: newId(),
         role: 'assistant',
@@ -240,6 +254,7 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
       }
       await persist({ ...latest, messages: [...latest.messages, reply], updatedAt: reply.createdAt })
     }
+    if (convRef.current?.id !== origin) return
     if (!result.ok && !result.aborted) {
       if (result.code === 'consent_required') setConsent(null)
       if (!text.trim()) setFailure({ userMessageId, code: result.code, resetsAt: result.resetsAt })
@@ -253,21 +268,64 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
     if (!text || !conversation || !granted || !online || abortRef.current) return
     const message: MizoMessage = { id: newId(), role: 'user', text, createdAt: new Date().toISOString() }
     setDraft('')
-    await persist({ ...conversation, messages: [...conversation.messages, message], updatedAt: message.createdAt })
+    const title = conversation.titleSource === 'manual' || conversation.title ? conversation.title : titleFrom(text)
+    await persist({ ...conversation, title, messages: [...conversation.messages, message], updatedAt: message.createdAt })
     await answer(message.id)
   }
 
-  const deleteChat = async () => {
+  /** Opens a saved chat. Any reply still streaming is stopped and kept in its own chat. */
+  const openChat = async (next: MizoConversation) => {
+    abortRef.current?.abort()
+    convRef.current = next
+    setState({ status: 'ready', conversation: next })
+    setFailure(null)
+    setPending(null)
+    setDraft('')
+    setListOpen(false)
     try {
-      abortRef.current?.abort()
+      await (await getStore()).setActive(userId, next.id)
+    } catch {
+      setSaveError(true)
+    }
+  }
+
+  /** Saves a new empty chat right away so it stays open across navigation and reloads. An already empty open chat is reused, never duplicated. */
+  const startNewChat = async () => {
+    const current = convRef.current
+    const reuse = current !== null && current.messages.length === 0 && !abortRef.current
+    const next = reuse ? current : newConversation(userId)
+    if (reuse) setListOpen(false)
+    else await openChat(next)
+    if (!chats.some((c) => c.id === next.id)) await persist(next)
+  }
+
+  const renameChat = async () => {
+    if (!renaming) return
+    const title = renaming.title.replace(/\s+/g, ' ').trim().slice(0, 80)
+    const target = convRef.current?.id === renaming.id ? convRef.current : chats.find((c) => c.id === renaming.id)
+    setRenaming(null)
+    if (!target) return
+    await persist({ ...target, title: title || titleFrom(target.messages.find((m) => m.role === 'user')?.text ?? ''), titleSource: title ? 'manual' : 'auto' })
+  }
+
+  const deleteChat = async () => {
+    const id = confirmDelete
+    if (!id) return
+    try {
+      if (convRef.current?.id === id) abortRef.current?.abort()
       const s = await getStore()
-      await s.remove(userId)
-      const empty = { userId, messages: [], updatedAt: new Date().toISOString() }
-      convRef.current = empty
-      setState({ status: 'ready', conversation: empty })
-      setFailure(null)
+      await s.remove(userId, id)
+      const rest = chats.filter((c) => c.id !== id)
+      setChats(rest)
+      if (convRef.current?.id === id) {
+        const next = rest[0] ?? newConversation(userId)
+        convRef.current = next
+        setState({ status: 'ready', conversation: next })
+        setFailure(null)
+        await s.setActive(userId, rest[0]?.id ?? null)
+      }
       setDeleteError(false)
-      setConfirmDelete(false)
+      setConfirmDelete(null)
     } catch {
       setDeleteError(true)
     }
@@ -286,6 +344,22 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4" data-mizo-workspace={userId}>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={() => setListOpen(true)} aria-label={t('mizo.chats.open')}>
+          <Menu aria-hidden />
+          <span className="max-w-[45vw] truncate sm:max-w-xs" dir="auto">{state.status === 'ready' && state.conversation.title ? state.conversation.title : t('mizo.chats.untitled')}</span>
+        </Button>
+        <div className="ms-auto flex items-center gap-1">
+          {messages.length > 0 && state.status === 'ready' && (
+            <Button variant="ghost" size="icon" aria-label={t('mizo.delete.action')} onClick={() => setConfirmDelete(state.conversation.id)}>
+              <Trash2 aria-hidden />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" aria-label={t('mizo.chats.new')} disabled={messages.length === 0 && !busy} onClick={() => void startNewChat()}>
+            <SquarePen aria-hidden />
+          </Button>
+        </div>
+      </div>
       {state.status === 'error' && <MizoNotice kind="error">{t('mizo.error.history')}</MizoNotice>}
       {saveError && <MizoNotice kind="error">{t('mizo.error.history')}</MizoNotice>}
 
@@ -311,12 +385,6 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
         </Card>
       ) : (
         <>
-          <div className="flex justify-end">
-            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)}>
-              <Trash2 aria-hidden />
-              {t('mizo.delete.action')}
-            </Button>
-          </div>
           <ol className="flex flex-col gap-3" aria-label={t('mizo.history.label')}>
             {messages.map((m) => (
               <li key={m.id} className={cn('flex flex-col', m.role === 'user' ? 'items-end' : 'items-start')}>
@@ -440,7 +508,78 @@ export function MizoWorkspace({ userId, store, transport }: { userId: string; st
         </form>
       )}
 
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <Sheet open={listOpen} onOpenChange={setListOpen}>
+        <SheetContent side={app.i18n.locale === 'ar' ? 'right' : 'left'} className="p-4">
+          <SheetHeader className="p-0">
+            <SheetTitle>{t('mizo.chats.title')}</SheetTitle>
+          </SheetHeader>
+          <Button variant="outline" onClick={() => void startNewChat()}>
+            <SquarePen aria-hidden />
+            {t('mizo.chats.new')}
+          </Button>
+          {chats.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('mizo.chats.empty')}</p>
+          ) : (
+            <ul className="flex flex-col gap-1 overflow-y-auto" aria-label={t('mizo.chats.title')}>
+              {chats.map((c) => {
+                const current = state.status === 'ready' && state.conversation.id === c.id
+                const name = c.title || t('mizo.chats.untitled')
+                return (
+                  <li key={c.id} className={cn('flex items-center gap-1 rounded-xl', current && 'bg-muted')}>
+                    <button
+                      type="button"
+                      dir="auto"
+                      aria-current={current ? 'true' : undefined}
+                      onClick={() => void openChat(c)}
+                      className="min-w-0 flex-1 truncate rounded-xl px-3 py-2 text-start text-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                    >
+                      {name}
+                    </button>
+                    <Button variant="ghost" size="icon-sm" aria-label={t('mizo.chats.rename', { name })} onClick={() => (setListOpen(false), setRenaming({ id: c.id, title: c.title }))}>
+                      <Pencil aria-hidden />
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" aria-label={t('mizo.chats.delete', { name })} onClick={() => (setListOpen(false), setConfirmDelete(c.id))}>
+                      <Trash2 aria-hidden />
+                    </Button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={renaming !== null} onOpenChange={(o) => !o && setRenaming(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('mizo.chats.renameTitle')}</DialogTitle>
+          </DialogHeader>
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void renameChat()
+            }}
+          >
+            <Input
+              dir="auto"
+              maxLength={80}
+              aria-label={t('mizo.chats.renameTitle')}
+              value={renaming?.title ?? ''}
+              onChange={(e) => setRenaming((r) => (r ? { ...r, title: e.target.value } : r))}
+              autoFocus
+            />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setRenaming(null)}>
+                {t('mizo.delete.cancel')}
+              </Button>
+              <Button type="submit">{t('mizo.chats.save')}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmDelete !== null} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('mizo.delete.title')}</AlertDialogTitle>

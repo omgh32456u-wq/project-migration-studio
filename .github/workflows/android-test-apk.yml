@@ -1,0 +1,88 @@
+name: Android Test APK
+
+on:
+  push:
+    branches:
+      - development/mizano-roadmap
+    paths:
+      - capacitor.config.ts
+      - vite.config.ts
+      - .github/workflows/android-test-apk.yml
+      - src/lib/mizo/client.ts
+      - src/routes/api/public/mizo/chat.ts
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    name: Build installable bundled Android APK
+    runs-on: ubuntu-latest
+    env:
+      VITE_MIZO_API_ORIGIN: https://project-migration-studio-git-devel-e73b2f-ndnskvksjcjjdjdj-5162.vercel.app
+    steps:
+      - name: Check out test branch
+        uses: actions/checkout@v4
+        with:
+          ref: development/mizano-roadmap
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install project dependencies
+        run: bun install
+
+      - name: Add Capacitor Android tooling
+        run: bun add --dev @capacitor/cli@^8 @capacitor/android@^8
+
+      - name: Build the actual Mizano web application
+        run: bun run build
+
+      - name: Package the generated static SPA inside Capacitor
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHELL_FILE="$(find . -type f -name '_shell.html' \
+            -not -path './node_modules/*' \
+            -not -path './android/*' \
+            | head -n 1)"
+          if [ -z "$SHELL_FILE" ]; then
+            echo "TanStack Start did not emit _shell.html. Build output:"
+            find . -maxdepth 4 -type f \( -name 'index.html' -o -name '_shell.html' \) -not -path './node_modules/*' | sort
+            exit 1
+          fi
+          SOURCE_DIR="$(dirname "$SHELL_FILE")"
+          mkdir -p dist-native
+          cp -a "$SOURCE_DIR"/. dist-native/
+          cp "$SHELL_FILE" dist-native/index.html
+          test -s dist-native/index.html
+          echo "Bundled SPA shell: $SHELL_FILE"
+          echo "Bundled files:"
+          find dist-native -maxdepth 2 -type f | head -n 40
+
+      - name: Generate Android project
+        run: bunx cap add android
+
+      - name: Sync bundled web assets into Android
+        run: bunx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mizano-bundled-test-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

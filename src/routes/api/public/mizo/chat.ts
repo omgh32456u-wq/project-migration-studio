@@ -1,10 +1,40 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 /**
- * Mizo text endpoint. Lives under /api/public so the Android shell can reach it on the published
- * site; every request is still authenticated here with the caller's Supabase session.
- * Secrets (provider key, service role) are read only inside the handler, never at module scope.
+ * Mizo text endpoint. The UI is bundled in the Android APK, so its requests reach
+ * this server route cross-origin. Only the known Capacitor localhost origins are allowed.
+ * Every POST is still authenticated with the caller's Supabase session.
  */
+const NATIVE_ORIGINS = new Set([
+  'http://localhost',
+  'https://localhost',
+  'capacitor://localhost',
+  'ionic://localhost',
+])
+
+function corsHeaders(request: Request): Headers {
+  const headers = new Headers()
+  const origin = request.headers.get('origin')
+  if (origin && NATIVE_ORIGINS.has(origin)) {
+    headers.set('Access-Control-Allow-Origin', origin)
+    headers.set('Vary', 'Origin')
+    headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept')
+    headers.set('Access-Control-Max-Age', '600')
+  }
+  return headers
+}
+
+function withCors(request: Request, response: Response): Response {
+  const headers = new Headers(response.headers)
+  for (const [key, value] of corsHeaders(request)) headers.set(key, value)
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
+}
+
 async function handle(request: Request): Promise<Response> {
   const [{ handleMizoChat }, { readMizoConfig }, { createOpenAiCompatibleProvider }] = await Promise.all([
     import('@/lib/mizo/chat-handler.server'),
@@ -15,7 +45,7 @@ async function handle(request: Request): Promise<Response> {
 
   const admin = async () => (await import('@/integrations/supabase/client.server')).supabaseAdmin
 
-  return handleMizoChat(request, {
+  const response = await handleMizoChat(request, {
     config,
     createProvider: (c) => createOpenAiCompatibleProvider(c),
     verifyUser: async (token) => {
@@ -52,13 +82,14 @@ async function handle(request: Request): Promise<Response> {
       },
     },
   })
+  return withCors(request, response)
 }
 
 export const Route = createFileRoute('/api/public/mizo/chat')({
   server: {
     handlers: {
       POST: ({ request }) => handle(request),
-      OPTIONS: ({ request }) => handle(request),
+      OPTIONS: ({ request }) => new Response(null, { status: 204, headers: corsHeaders(request) }),
     },
   },
 })

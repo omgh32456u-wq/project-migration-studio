@@ -125,6 +125,9 @@ describe('Mizo endpoint: consent and configuration', () => {
       expect(res.status).toBe(400)
       expect(fetchImpl).not.toHaveBeenCalled()
     }
+    expect(ar).toContain('اللهجة المصرية')
+    expect(ar).toContain('كنت بتصيع فين من ورايا')
+    expect(en).toContain('Reply in clear, natural English')
   })
 })
 
@@ -151,15 +154,15 @@ describe('Mizo endpoint: quota and rate limits', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
-  it('reads the agreed defaults: 15/day, 2 at once, 5 per minute, 700 output tokens', () => {
+  it('reads the agreed defaults: 15/day, 2 at once, 5 per minute, 4000 output tokens', () => {
     const c = readMizoConfig({})
-    expect(c.limits).toEqual({ dailyRequests: 15, concurrent: 2, burstPerMinute: 5, maxOutputTokens: 700, timeoutMs: 60_000 })
+    expect(c.limits).toEqual({ dailyRequests: 15, concurrent: 2, burstPerMinute: 5, maxOutputTokens: 4000, timeoutMs: 120_000 })
     expect(c.provider).toEqual({ id: 'ashna', baseUrl: 'https://api.ashna.ai/v1/api', model: 'ashna-x1', apiKey: null })
     const custom = readMizoConfig({ ASHNA_API_KEY: 'k', MIZO_MODEL: 'glm-5.3', MIZO_DAILY_REQUEST_LIMIT: '30', MIZO_MAX_OUTPUT_TOKENS: 'lots' })
     expect(custom.provider?.model).toBe('glm-5.3')
     expect(custom.provider?.apiKey).toBe('k')
     expect(custom.limits.dailyRequests).toBe(30)
-    expect(custom.limits.maxOutputTokens).toBe(700)
+    expect(custom.limits.maxOutputTokens).toBe(4000)
     expect(readMizoConfig({ MIZO_PROVIDER_BASE_URL: 'http://insecure.example' }).provider?.baseUrl).toBe('https://api.ashna.ai/v1/api')
     const other = readMizoConfig({ MIZO_PROVIDER: 'openai_compatible', MIZO_PROVIDER_BASE_URL: 'https://llm.example/v1', MIZO_MODEL: 'm', MIZO_PROVIDER_API_KEY: 'x', ASHNA_API_KEY: 'unused' })
     expect(other.provider).toEqual({ id: 'openai_compatible', baseUrl: 'https://llm.example/v1', model: 'm', apiKey: 'x' })
@@ -171,7 +174,7 @@ describe('Mizo endpoint: quota and rate limits', () => {
     const sent = sentToProvider(fetchImpl)
     expect(sent.url).toBe('https://api.ashna.ai/v1/api/chat/completions')
     expect(sent.headers.Authorization).toBe('Bearer test-key')
-    expect(sent.json).toMatchObject({ model: 'ashna-x1', stream: true, max_tokens: 700 })
+    expect(sent.json).toMatchObject({ model: 'ashna-x1', stream: true, max_tokens: 4000 })
   })
 })
 
@@ -243,12 +246,28 @@ describe('Mizo endpoint: provider errors', () => {
     expect(usage.finish).toHaveBeenCalledWith('r1', 'alice', 'aborted', 4)
   })
 
-  it('accepts a stream that ends without [DONE] after text (OpenAI convention)', async () => {
+  it('marks a provider stream incomplete when it closes before [DONE]', async () => {
     const { deps, usage } = setup({ fetch: providerFetch(() => new Response(sseBody(['Partial'], false), { headers: { 'content-type': 'text/event-stream' } })) })
     const res = await handleMizoChat(post(body()), deps)
     const ev = await events(res)
-    expect(ev.at(-1)).toEqual({ type: 'done' })
-    expect(usage.finish).toHaveBeenCalledWith('r1', 'alice', 'completed', 7)
+    expect(ev.slice(1)).toEqual([{ type: 'delta', text: 'Partial' }, { type: 'error', code: 'provider_malformed' }])
+    expect(ev.at(-1)).not.toEqual({ type: 'done' })
+    expect(usage.finish).toHaveBeenCalledWith('r1', 'alice', 'aborted', 7)
+  })
+
+  it('marks output-token exhaustion as incomplete even if the provider sends [DONE]', async () => {
+    const enc = new TextEncoder()
+    const limited = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Partial answer' } }] })}\n\n`))
+        c.enqueue(enc.encode(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'length' }] })}\n\n`))
+        c.enqueue(enc.encode('data: [DONE]\n\n'))
+        c.close()
+      },
+    })
+    const { deps } = setup({ fetch: providerFetch(() => new Response(limited, { headers: { 'content-type': 'text/event-stream' } })) })
+    const ev = await events(await handleMizoChat(post(body()), deps))
+    expect(ev.slice(1)).toEqual([{ type: 'delta', text: 'Partial answer' }, { type: 'error', code: 'provider_malformed' }])
   })
 })
 
@@ -274,12 +293,27 @@ describe('Mizo endpoint: context window and persona', () => {
     const en = mizoSystemPrompt('en')
     const ar = mizoSystemPrompt('ar')
     expect(ar).toContain('Egyptian Arabic')
-    expect(en).toContain('Reply in clear, friendly English')
+    expect(en).toContain('Reply in clear, natural English')
     for (const p of [en, ar]) {
       expect(p).toMatch(/Never invent exact nutrition numbers/)
       expect(p).toMatch(/Don't diagnose/)
-      expect(p).toMatch(/Never suggest skipping meals/)
+      expect(p).toMatch(/Never give minors restrictive weight-loss diets/)
       expect(p).toMatch(/15–17/)
+      expect(p).toContain('Omar Elhady')
+      expect(p).toContain('young applications and web developer/programmer')
+      expect(p).toContain('more than a basic calorie counter')
+      expect(p).toContain('genuinely useful nutrition companion')
+      expect(p).toContain('simple, sincere thank-you')
+      expect(p).toContain('everyone who has supported him and continues to support him')
+      expect(p).toContain('If the person asks to hear more, explain the approved vision and include the simple thank-you message')
+      expect(p).toContain('Do not identify yourself as ChatGPT, DeepSeek')
+      expect(p).toContain('أنا Mizo، المساعد الذكي جوّه Mizano.')
+      expect(p).not.toContain('أما موديل الذكاء الاصطناعي فهو التقنية اللي بستخدمها')
+      expect(p).toContain('Build familiarity gradually')
+      expect(p).toContain('Do not force jokes')
+      expect(p).toContain('Chat is for natural conversation')
     }
+    expect(ar).toContain('اللهجة المصرية')
+    expect(ar).toContain('كنت بتصيع فين من ورايا')
   })
 })

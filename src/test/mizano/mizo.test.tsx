@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { createTranslator } from '@/lib/i18n'
 import { defaultSettings } from '@/lib/defaults'
 import type { AccountState, AuthClient } from '@/lib/account'
-import { MemoryChatStore, type ChatStore, type MizoConversation } from '@/lib/mizo/chat-store'
+import { MemoryChatStore, titleFrom, type ChatStore, type MizoConversation } from '@/lib/mizo/chat-store'
 import type { MizoTransport } from '@/lib/mizo/client'
 
 const store = { status: 'ready' as const, settings: defaultSettings(), i18n: createTranslator('en'), updateSettings: vi.fn(async () => {}) }
@@ -21,11 +21,17 @@ const client: AuthClient = {
   signOut: vi.fn(async () => {}),
 } as unknown as AuthClient
 
-const conv = (userId: string, text: string): MizoConversation => ({
+const conv = (userId: string, text: string, id = `c-${userId}`, updatedAt = '2026-11-14T00:00:00.000Z'): MizoConversation => ({
+  id,
   userId,
-  updatedAt: '2026-11-14T00:00:00.000Z',
+  title: titleFrom(text),
+  titleSource: 'auto',
+  kind: 'chat',
+  createdAt: updatedAt,
+  updatedAt,
   messages: [{ id: 'm1', role: 'user', text, createdAt: '2026-11-14T00:00:00.000Z' }],
 })
+const msgs = async (s: ChatStore, u: string) => (await s.list(u))[0]?.messages ?? []
 const signedIn = (id: string): AccountState => ({ status: 'signed_in', user: { id, email: `${id}@x.co`, providerName: null } })
 const consented = async (userId: string) => {
   const s = new MemoryChatStore()
@@ -43,18 +49,21 @@ describe('Mizo chat store', () => {
   it('keeps each account separate and refuses an empty account id', async () => {
     const s = new MemoryChatStore()
     await s.save(conv('a', 'from a'))
-    expect((await s.load('b')).messages).toEqual([])
-    expect((await s.load('a')).messages[0].text).toBe('from a')
-    await expect(s.load('')).rejects.toThrow()
-    await s.remove('a')
-    expect((await s.load('a')).messages).toEqual([])
+    expect(await s.list('b')).toEqual([])
+    expect(await s.get('b', 'c-a')).toBeNull()
+    await s.remove('b', 'c-a')
+    await expect(s.save({ ...conv('b', 'steal'), id: 'c-a' })).rejects.toThrow()
+    expect((await s.get('a', 'c-a'))?.messages[0].text).toBe('from a')
+    await expect(s.list('')).rejects.toThrow()
+    await s.remove('a', 'c-a')
+    expect(await s.list('a')).toEqual([])
   })
 })
 
 describe('Mizo screen', () => {
   it('never mounts the chat or reads history for guests', () => {
     const s = new MemoryChatStore()
-    const load = vi.spyOn(s, 'load')
+    const load = vi.spyOn(s, 'list')
     const { container } = renderMizo({ status: 'guest' }, s)
     expect(container.querySelector('[data-mizo-workspace]')).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
@@ -99,9 +108,9 @@ describe('Mizo screen', () => {
     expect(screen.getByText('1 of 15 messages used today')).toBeInTheDocument()
     const sent = transport.mock.calls[0][0].request
     expect(sent).toEqual({ locale: 'en', consentVersion: 1, messages: [{ role: 'user', content: 'snack?' }] })
-    const saved = (await s.load('u1')).messages
+    const saved = (await msgs(s, 'u1'))
     expect(saved.map((m) => [m.role, m.text, m.status])).toEqual([['user', 'snack?', undefined], ['assistant', 'Try yogurt.', 'complete']])
-    expect((await s.load('other')).messages).toEqual([])
+    expect((await msgs(s, 'other'))).toEqual([])
   })
 
   it('retries a failed question without saving it twice', async () => {
@@ -117,7 +126,7 @@ describe('Mizo screen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(transport).toHaveBeenCalledTimes(2))
     expect(await screen.findByText('Here you go')).toBeInTheDocument()
-    const saved = (await s.load('u1')).messages
+    const saved = (await msgs(s, 'u1'))
     expect(saved.filter((m) => m.role === 'user')).toHaveLength(1)
     expect(saved).toHaveLength(2)
     expect(transport.mock.calls[1][0].request.messages).toEqual([{ role: 'user', content: 'idea?' }])
@@ -136,7 +145,7 @@ describe('Mizo screen', () => {
     expect(await screen.findByText('Mizo is writing…', { selector: 'span' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Stop reply' }))
     expect(await screen.findByText('You stopped this reply.')).toBeInTheDocument()
-    expect((await s.load('u1')).messages.at(-1)).toMatchObject({ role: 'assistant', text: 'Partial answer', status: 'stopped' })
+    expect((await msgs(s, 'u1')).at(-1)).toMatchObject({ role: 'assistant', text: 'Partial answer', status: 'stopped' })
   })
 
   it('turning sharing off hides the composer and sends nothing', async () => {
@@ -171,15 +180,138 @@ describe('Mizo screen', () => {
     await s.save(conv('u1', 'my question'))
     await s.save(conv('other', 'keep me'))
     renderMizo(signedIn('u1'), s)
-    expect(await screen.findByText('my question')).toBeInTheDocument()
+    expect(await screen.findByText('my question', { selector: 'p' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Delete chat' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    expect((await s.load('u1')).messages).toHaveLength(1)
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull())
+    expect((await msgs(s, 'u1'))).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Delete chat' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
-    await waitFor(() => expect(screen.queryByText('my question')).toBeNull())
-    expect((await s.load('u1')).messages).toEqual([])
-    expect((await s.load('other')).messages).toHaveLength(1)
+    await waitFor(() => expect(screen.queryByText('my question', { selector: 'p' })).toBeNull())
+    expect((await msgs(s, 'u1'))).toEqual([])
+    expect((await msgs(s, 'other'))).toHaveLength(1)
+  })
+})
+
+describe('Mizo conversations', () => {
+  it('titles a chat from its first question, cut at a word', () => {
+    expect(titleFrom('  what   should I eat\nmore')).toBe('what should I eat')
+    expect(titleFrom('a'.repeat(30) + ' ' + 'b'.repeat(50))).toBe('a'.repeat(30) + '…')
+    expect(Array.from(titleFrom('word '.repeat(20))).length).toBeLessThanOrEqual(41)
+    expect(titleFrom('ماذا آكل على الفطار؟')).toBe('ماذا آكل على الفطار؟')
+  })
+
+  it('starts a new chat, keeps both, and sends only the open chat', async () => {
+    const s = await consented('u1')
+    await s.save(conv('u1', 'old question', 'old'))
+    const transport = vi.fn<MizoTransport>(async ({ onDelta }) => (onDelta('ok'), { ok: true, usage: null }))
+    renderMizo(signedIn('u1'), s, transport)
+    expect(await screen.findByText('old question', { selector: 'p' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    await waitFor(() => expect(screen.queryByText('old question', { selector: 'p' })).toBeNull())
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'fresh topic' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByText('ok')).toBeInTheDocument()
+    expect(transport.mock.calls[0][0].request.messages).toEqual([{ role: 'user', content: 'fresh topic' }])
+    const list = await s.list('u1')
+    expect(list).toHaveLength(2)
+    expect(list[0]).toMatchObject({ title: 'fresh topic' })
+    expect(await s.getActive('u1')).toBe(list[0].id)
+    expect((await s.get('u1', 'old'))?.messages).toHaveLength(1)
+  })
+
+  it('restores the last open chat after leaving Mizo, and falls back when it is gone', async () => {
+    const s = new MemoryChatStore()
+    await s.save(conv('u1', 'first chat', 'a', '2026-11-14T00:00:00.000Z'))
+    await s.save(conv('u1', 'newest chat', 'b', '2026-11-14T05:00:00.000Z'))
+    await s.setActive('u1', 'a')
+    const first = renderMizo(signedIn('u1'), s)
+    expect(await screen.findByText('first chat', { selector: 'p' })).toBeInTheDocument()
+    first.unmount()
+    renderMizo(signedIn('u1'), s)
+    expect(await screen.findByText('first chat', { selector: 'p' })).toBeInTheDocument()
+    await s.remove('u1', 'a')
+    cleanup()
+    renderMizo(signedIn('u1'), s)
+    expect(await screen.findByText('newest chat', { selector: 'p' })).toBeInTheDocument()
+    await waitFor(async () => expect(await s.getActive('u1')).toBe('b'))
+  })
+
+  it('keeps a new empty chat open across leaving Mizo, without duplicates, and falls back when it is deleted', async () => {
+    const s = new MemoryChatStore()
+    await s.save(conv('u1', 'older chat', 'old'))
+    await s.setActive('u1', 'old')
+    const first = renderMizo(signedIn('u1'), s)
+    expect(await screen.findByText('older chat', { selector: 'p' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    await waitFor(async () => expect(await s.list('u1')).toHaveLength(2))
+    const fresh = (await s.list('u1')).find((c) => c.id !== 'old')!
+    expect(fresh.messages).toEqual([])
+    await waitFor(async () => expect(await s.getActive('u1')).toBe(fresh.id))
+    first.unmount()
+    renderMizo(signedIn('u1'), s)
+    expect(await screen.findByText("Hi, I'm Mizo")).toBeInTheDocument()
+    expect(screen.queryByText('older chat', { selector: 'p' })).toBeNull()
+    // Asking for another new chat while the empty one is open reuses it.
+    fireEvent.click(screen.getByRole('button', { name: 'Your chats' }))
+    await screen.findByRole('heading', { name: 'Your chats' })
+    fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'New chat' })[0])
+    await waitFor(async () => expect(await s.list('u1')).toHaveLength(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Your chats' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete New chat' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await waitFor(async () => expect(await s.get('u1', fresh.id)).toBeNull())
+    expect(await screen.findByText('older chat', { selector: 'p' })).toBeInTheDocument()
+    expect(await s.getActive('u1')).toBe('old')
+    expect(await s.list('u1')).toHaveLength(1)
+  })
+
+  it('opens, renames and deletes one chat from the list without touching the others or consent', async () => {
+    const s = await consented('u1')
+    await s.save(conv('u1', 'keep this', 'a', '2026-11-14T00:00:00.000Z'))
+    await s.save(conv('u1', 'remove this', 'b', '2026-11-14T05:00:00.000Z'))
+    renderMizo(signedIn('u1'), s)
+    expect(await screen.findByText('remove this', { selector: 'p' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Your chats' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'keep this' }))
+    expect(await screen.findByText('keep this', { selector: 'p' })).toBeInTheDocument()
+    await waitFor(async () => expect(await s.getActive('u1')).toBe('a'))
+    fireEvent.click(screen.getByRole('button', { name: 'Your chats' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename keep this' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Rename chat' }), { target: { value: 'Breakfast ideas' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(async () => expect(await s.get('u1', 'a')).toMatchObject({ title: 'Breakfast ideas', titleSource: 'manual' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Your chats' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete remove this' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await waitFor(async () => expect(await s.get('u1', 'b')).toBeNull())
+    expect((await s.get('u1', 'a'))?.messages).toHaveLength(1)
+    expect(await s.loadConsent('u1')).toMatchObject({ granted: true })
+  })
+
+  it('a reply still arriving after switching chats is saved to its own chat only', async () => {
+    const s = await consented('u1')
+    await s.save(conv('u1', 'other chat', 'other', '2026-11-13T00:00:00.000Z'))
+    const transport: MizoTransport = ({ onDelta, signal }) =>
+      new Promise((resolve) => {
+        onDelta('half reply')
+        signal.addEventListener('abort', () => resolve({ ok: false, code: 'unknown', aborted: true, usage: null }))
+      })
+    renderMizo(signedIn('u1'), s, transport)
+    expect(await screen.findByText('other chat', { selector: 'p' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    await waitFor(() => expect(screen.queryByText('other chat', { selector: 'p' })).toBeNull())
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'slow question' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByText('half reply')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Your chats' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'other chat' }))
+    expect(await screen.findByText('other chat', { selector: 'p' })).toBeInTheDocument()
+    await waitFor(async () => expect((await s.list('u1')).find((c) => c.title === 'slow question')?.messages).toHaveLength(2))
+    expect(screen.queryByText('half reply')).toBeNull()
+    expect((await s.get('u1', 'other'))?.messages).toHaveLength(1)
+    const slow = (await s.list('u1')).find((c) => c.title === 'slow question')!
+    expect(slow.messages[1]).toMatchObject({ role: 'assistant', text: 'half reply', status: 'stopped' })
   })
 })
 

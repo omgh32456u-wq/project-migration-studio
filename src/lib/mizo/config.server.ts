@@ -21,8 +21,8 @@ export const MIZO_DEFAULT_LIMITS: MizoLimits = {
   dailyRequests: 15,
   concurrent: 2,
   burstPerMinute: 5,
-  maxOutputTokens: 700,
-  timeoutMs: 60_000,
+  maxOutputTokens: 4000,
+  timeoutMs: 120_000,
 }
 
 export interface MizoProviderConfig {

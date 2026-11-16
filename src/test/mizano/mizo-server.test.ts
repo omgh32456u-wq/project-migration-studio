@@ -259,7 +259,8 @@ describe('Mizo endpoint: provider errors', () => {
     const enc = new TextEncoder()
     const limited = new ReadableStream<Uint8Array>({
       start(c) {
-        c.enqueue(enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Partial answer' }, finish_reason: 'length' }] })}\n\n`))
+        c.enqueue(enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Partial answer' } }] })}\n\n`))
+        c.enqueue(enc.encode(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'length' }] })}\n\n`))
         c.enqueue(enc.encode('data: [DONE]\n\n'))
         c.close()
       },
